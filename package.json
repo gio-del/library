@@ -1,0 +1,7 @@
+{
+  "name": "library",
+  "private": true,
+  "description": "Scansiona gli ISBN e tieni la tua libreria virtuale",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.js", "test": "node --test" }
+}
