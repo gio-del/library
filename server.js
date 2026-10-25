@@ -6,7 +6,7 @@ const path = require('node:path');
 const { normalize } = require('./lib/isbn');
 const { createStore } = require('./lib/store');
 const { createAuth } = require('./lib/auth');
-const { lookup } = require('./lib/lookup');
+const { lookup, fetchCover } = require('./lib/lookup');
 
 const MAX_BODY = 4096;
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -71,19 +71,21 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
   }
 
   // Cerca i dati del libro e li applica a `book` (lookup:'failed' se non trovati).
+  async function saveCover(book, cover) {
+    try {
+      await fsp.mkdir(coversDir, { recursive: true, mode: 0o700 });
+      await fsp.writeFile(path.join(coversDir, `${book.isbn}.jpg`), cover, { mode: 0o600 });
+      book.cover = `${book.isbn}.jpg`;
+    } catch { /* senza copertina */ }
+  }
+
   async function fillBook(book) {
     delete book.lookup;
     let found = null;
     try { found = await lookup(book.isbn, fetchFn); } catch { /* trattato come non trovato */ }
     if (!found) { book.lookup = 'failed'; return; }
     Object.assign(book, { title: found.title, authors: found.authors, publisher: found.publisher, year: found.year, source: found.source });
-    if (found.cover) {
-      try {
-        await fsp.mkdir(coversDir, { recursive: true, mode: 0o700 });
-        await fsp.writeFile(path.join(coversDir, `${book.isbn}.jpg`), found.cover, { mode: 0o600 });
-        book.cover = `${book.isbn}.jpg`;
-      } catch { /* senza copertina */ }
-    }
+    if (found.cover) await saveCover(book, found.cover);
   }
 
   async function addBook(isbn) {
@@ -94,12 +96,16 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     return { status: 201, body: { status: 'saved', book } };
   }
 
-  // Riprova la ricerca di un libro salvato senza dati.
+  // Riprova la ricerca di un libro salvato senza dati o senza copertina.
   async function retryBook(isbn) {
     const old = await store.get(isbn);
     if (!old) return null;
     const book = { ...old };
-    await fillBook(book);
+    if (old.lookup !== 'failed') {
+      // dati già presenti: si cerca solo la copertina
+      const cover = await fetchCover(old.isbn, fetchFn);
+      if (cover) await saveCover(book, cover);
+    } else await fillBook(book);
     return (await store.replace(book)) || null;
   }
 
@@ -127,7 +133,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     }
     if (req.method === 'POST' && p === '/api/books/lookup-failed') {
       const out = [];
-      for (const b of await store.list()) if (b.lookup === 'failed') { const r = await retryBook(b.isbn); if (r) out.push(r); }
+      for (const b of await store.list()) if (b.lookup === 'failed' || !b.cover) { const r = await retryBook(b.isbn); if (r) out.push(r); }
       return send(res, 200, { retried: out.length, found: out.filter((b) => b.lookup !== 'failed').length, books: out });
     }
     const lk = /^\/api\/books\/(\d{13})\/lookup$/.exec(p);
