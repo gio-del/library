@@ -98,3 +98,32 @@ test('richiesta troppo grande: 413; pagine statiche con CSP', async (t) => {
   assert.match(home.headers.get('content-security-policy'), /default-src 'self'/);
   assert.strictEqual((await call('GET', '/../server.js')).status, 404);
 });
+
+test('app installabile: manifest, icone e sw.js senza sessione; il resto resta chiuso', async (t) => {
+  const { call } = await start(t);
+  const res = await call('GET', '/manifest.webmanifest');
+  assert.strictEqual(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^application\/manifest\+json/);
+  const m = await res.json();
+  assert.strictEqual(m.name, 'Libreria');
+  assert.strictEqual(m.start_url, '/');
+  assert.strictEqual(m.display, 'standalone');
+  for (const size of ['192x192', '512x512']) {
+    for (const purpose of ['any', 'maskable']) {
+      const icon = m.icons.find((i) => i.sizes === size && i.purpose === purpose);
+      assert.ok(icon, `${size} ${purpose}`);
+      const r = await call('GET', icon.src);
+      assert.strictEqual(r.status, 200, icon.src);
+      assert.strictEqual(r.headers.get('content-type'), 'image/png');
+      assert.deepStrictEqual([...Buffer.from(await r.arrayBuffer()).subarray(1, 4)], [0x50, 0x4e, 0x47]);
+    }
+  }
+  assert.strictEqual((await call('GET', '/icon.svg')).headers.get('content-type'), 'image/svg+xml');
+  assert.strictEqual((await call('GET', '/sw.js')).status, 200);
+  assert.strictEqual((await call('GET', '/offline.html')).status, 200);
+  assert.strictEqual((await call('GET', '/api/books')).status, 401);
+  assert.strictEqual((await call('GET', '/covers/9780306406157.jpg')).status, 401);
+  for (const p of ['/package.json', '/server.js', '/icon.gif', '/../server.js', '/Icon-192.png']) {
+    assert.strictEqual((await call('GET', p)).status, 404, p);
+  }
+});

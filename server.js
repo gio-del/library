@@ -9,7 +9,9 @@ const { createAuth } = require('./lib/auth');
 const { lookup } = require('./lib/lookup');
 
 const MAX_BODY = 4096;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml',
+};
 const HEADERS = {
   'content-security-policy': "default-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'permissions-policy': 'camera=(self)',
@@ -133,7 +135,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       try { return send(res, 200, await fsp.readFile(path.join(coversDir, `${cover[1]}.jpg`)), { 'content-type': 'image/jpeg' }); } catch { return send(res, 404, 'Non trovato'); }
     }
     const name = p === '/' ? 'index.html' : p.slice(1);
-    if (!/^[a-z0-9-]+\.(html|css|js)$/.test(name)) return send(res, 404, 'Non trovato');
+    if (!/^[a-z0-9-]+\.(html|css|js|webmanifest|png|svg)$/.test(name)) return send(res, 404, 'Non trovato');
     try { return send(res, 200, await fsp.readFile(path.join(publicDir, name)), { 'content-type': TYPES[path.extname(name)] }); } catch { return send(res, 404, 'Non trovato'); }
   }
 
