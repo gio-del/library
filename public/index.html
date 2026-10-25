@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libreria</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>Libreria</h1>
+  <nav id="nav" hidden>
+    <button id="tab-scan" type="button">Scansiona</button>
+    <button id="tab-lib" type="button">Libreria</button>
+    <button id="logout" type="button">Esci</button>
+  </nav>
+</header>
+<main>
+  <section id="login" hidden>
+    <form id="login-form">
+      <label>Utente <input id="user" autocomplete="username"></label>
+      <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit">Accedi</button>
+      <p id="login-msg" class="msg" role="alert"></p>
+    </form>
+  </section>
+  <section id="scan" hidden>
+    <video id="video" playsinline muted hidden></video>
+    <button id="camera" type="button">Apri la fotocamera</button>
+    <form id="manual-form">
+      <label>ISBN <input id="isbn" inputmode="numeric" autocomplete="off" placeholder="978…"></label>
+      <button type="submit">Cerca e salva</button>
+    </form>
+    <p id="scan-msg" class="msg" role="status"></p>
+    <article id="card" hidden>
+      <img id="card-cover" alt="">
+      <h2 id="card-title"></h2>
+      <p id="card-authors"></p>
+      <p id="card-meta"></p>
+    </article>
+  </section>
+  <section id="lib" hidden>
+    <p id="lib-msg" class="msg" role="status"></p>
+    <ul id="grid"></ul>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
