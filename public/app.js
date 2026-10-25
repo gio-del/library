@@ -122,3 +122,5 @@ $('login-form').addEventListener('submit', async (e) => {
 $('logout').addEventListener('click', async () => { await api('POST', '/api/logout').catch(() => {}); showLogin(); });
 
 api('GET', '/api/auth/status').then((s) => (s.authenticated ? show('scan') : showLogin())).catch(showLogin);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
