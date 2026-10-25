@@ -25,13 +25,17 @@ function show(name) {
 function showLogin() { show('login'); }
 
 function fillCard(book) {
+  cardBook = book;
   $('card').hidden = false;
   $('card-title').textContent = book.title || 'Titolo sconosciuto';
   $('card-authors').textContent = book.authors.join(', ');
   $('card-meta').textContent = [book.publisher, book.year, book.isbn].filter(Boolean).join(' · ');
   $('card-cover').hidden = !book.cover;
+  $('card-again').hidden = book.lookup !== 'failed';
   if (book.cover) $('card-cover').src = `/covers/${book.cover}`;
 }
+
+let cardBook = null;
 
 function setMode(m) {
   mode = m;
@@ -146,9 +150,11 @@ async function loadLibrary() {
     say($('lib-msg'), books.length ? `${books.length} libri` : 'La libreria è vuota');
     const grid = $('grid');
     grid.replaceChildren();
+    $('retry-all').hidden = !books.some((b) => b.lookup === 'failed');
     for (const b of books) {
       const li = document.createElement('li');
       if (b.cover) { const img = document.createElement('img'); img.src = `/covers/${b.cover}`; img.alt = ''; li.append(img); }
+      else { const ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = b.title || b.isbn; li.append(ph); }
       const t = document.createElement('span'); t.className = 't'; t.textContent = b.title || b.isbn;
       const a = document.createElement('span'); a.className = 'a'; a.textContent = b.authors.join(', ');
       const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = 'Elimina';
@@ -157,12 +163,43 @@ async function loadLibrary() {
         del.disabled = true;
         try { await api('DELETE', `/api/books/${b.isbn}`); li.remove(); } catch (e) { say($('lib-msg'), e.message, true); del.disabled = false; }
       });
-      li.append(t, a, del);
+      li.append(t, a);
+      if (b.lookup === 'failed') {
+        const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Cerca di nuovo';
+        again.addEventListener('click', async () => {
+          again.disabled = true;
+          say($('lib-msg'), 'Cerco…');
+          try { await api('POST', `/api/books/${b.isbn}/lookup`); await loadLibrary(); } catch (e) { say($('lib-msg'), e.message, true); again.disabled = false; }
+        });
+        li.append(again);
+      }
+      li.append(del);
       grid.append(li);
     }
   } catch (e) { if (e.status !== 401) say($('lib-msg'), e.message, true); }
 }
 
+$('retry-all').addEventListener('click', async () => {
+  $('retry-all').disabled = true;
+  say($('lib-msg'), 'Cerco i libri senza dati…');
+  try {
+    const r = await api('POST', '/api/books/lookup-failed');
+    await loadLibrary();
+    say($('lib-msg'), `Trovati i dati di ${r.found} libri su ${r.retried}`);
+  } catch (e) { say($('lib-msg'), e.message, true); }
+  $('retry-all').disabled = false;
+});
+$('card-again').addEventListener('click', async () => {
+  if (!cardBook) return;
+  $('card-again').disabled = true;
+  say($('scan-msg'), 'Cerco…');
+  try {
+    const r = await api('POST', `/api/books/${cardBook.isbn}/lookup`);
+    fillCard(r.book);
+    say($('scan-msg'), r.book.lookup === 'failed' ? 'Dati ancora non trovati' : 'Dati trovati');
+  } catch (e) { say($('scan-msg'), e.message, true); }
+  $('card-again').disabled = false;
+});
 $('tab-scan').addEventListener('click', () => show('scan'));
 $('tab-lib').addEventListener('click', loadLibrary);
 $('mode-add').addEventListener('click', () => setMode('add'));
