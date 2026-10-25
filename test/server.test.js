@@ -127,3 +127,28 @@ test('app installabile: manifest, icone e sw.js senza sessione; il resto resta c
     assert.strictEqual((await call('GET', p)).status, 404, p);
   }
 });
+
+test('GET libro e anteprima: presente, ISBN-10 equivalente, assente, non valido, senza sessione; nessuna scrittura', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  assert.strictEqual((await call('GET', '/api/books/9780306406157')).status, 401);
+  assert.strictEqual((await call('GET', '/api/lookup/9780306406157')).status, 401);
+  const sid = await login();
+  assert.strictEqual((await call('GET', '/api/books/9780306406157', undefined, sid)).status, 404);
+  await call('POST', '/api/books', { isbn: '9780306406157' }, sid);
+  const file = path.join(dataDir, 'books.json');
+  const before = fs.readFileSync(file, 'utf8');
+  for (const id of ['9780306406157', '978-0-306-40615-7', '0306406152']) {
+    const r = await call('GET', `/api/books/${id}`, undefined, sid);
+    assert.strictEqual(r.status, 200, id);
+    assert.strictEqual((await r.json()).isbn, '9780306406157');
+  }
+  assert.strictEqual((await call('GET', '/api/books/9780804429573', undefined, sid)).status, 404);
+  assert.strictEqual((await call('GET', '/api/books/12345', undefined, sid)).status, 400);
+  assert.strictEqual((await call('GET', '/api/books/9780306406158', undefined, sid)).status, 400);
+  const l = await call('GET', '/api/lookup/9780306406157', undefined, sid);
+  assert.strictEqual((await l.json()).title, 'Titolo <b>');
+  const miss = await call('GET', '/api/lookup/9781234567897', undefined, sid);
+  assert.deepStrictEqual(await miss.json(), { isbn: '9781234567897', title: '', authors: [] });
+  assert.strictEqual(fs.readFileSync(file, 'utf8'), before);
+  assert.strictEqual(fs.existsSync(path.join(dataDir, 'covers', '9780804429573.jpg')), false);
+});

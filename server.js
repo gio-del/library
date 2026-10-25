@@ -134,6 +134,22 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     if (req.method === 'POST' && lk) {
       const book = await retryBook(lk[1]);
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
+      }
+    const one = /^\/api\/(books|lookup)\/([^/]{1,40})$/.exec(p);
+    if (req.method === 'GET' && one) {
+      let raw = one[2];
+      try { raw = decodeURIComponent(raw); } catch { /* resta grezzo, non valido */ }
+      const isbn = normalize(raw);
+      if (!isbn) return send(res, 400, { error: 'ISBN non valido' });
+      if (one[1] === 'books') {
+        const book = await store.get(isbn);
+        return book ? send(res, 200, book) : send(res, 404, { error: 'Non trovato' });
+      }
+      // Anteprima dalle fonti per un libro non in libreria: nessuna scrittura, mai un errore.
+      try {
+        const found = await lookup(isbn, fetchFn);
+        return send(res, 200, found ? { isbn, title: found.title, authors: found.authors } : { isbn, title: '', authors: [] });
+      } catch { return send(res, 200, { isbn, title: '', authors: [] }); }
     }
     const m = /^\/api\/books\/([\d-]{10,17}|\d{9}X)$/.exec(p);
     if (req.method === 'DELETE' && m) {

@@ -2,6 +2,9 @@
 const $ = (id) => document.getElementById(id);
 let stream = null;
 let scanning = false;
+let mode = localStorage.getItem('mode') === 'check' ? 'check' : 'add';
+let lastCode = null;
+let checkSeq = 0;
 
 async function api(method, url, body) {
   const res = await fetch(url, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
@@ -34,7 +37,60 @@ function fillCard(book) {
 
 let cardBook = null;
 
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem('mode', m); } catch { /* storage non disponibile */ }
+  $('mode-add').setAttribute('aria-pressed', String(m === 'add'));
+  $('mode-check').setAttribute('aria-pressed', String(m === 'check'));
+  $('manual-form').querySelector('button').textContent = m === 'check' ? 'Controlla' : 'Cerca e salva';
+  $('verdict').hidden = true;
+  $('card').hidden = true;
+  lastCode = null;
+  say($('scan-msg'), '');
+}
+
+function buzz(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
+
+function verdict(yes, book) {
+  const v = $('verdict');
+  v.hidden = false;
+  v.className = yes ? 'yes' : 'no';
+  $('verdict-text').textContent = yes ? 'Ce l’hai già' : 'Non ce l’hai';
+  $('verdict-title').textContent = book.title || '';
+  $('verdict-authors').textContent = (book.authors || []).join(', ');
+  $('verdict-cover').hidden = !(yes && book.cover);
+  if (yes && book.cover) $('verdict-cover').src = `/covers/${book.cover}`;
+  $('verdict-add').hidden = yes;
+  $('verdict-add').disabled = false;
+  $('verdict-add').dataset.isbn = book.isbn || '';
+}
+
+async function checkIsbn(isbn) {
+  const seq = ++checkSeq;
+  $('card').hidden = true;
+  say($('scan-msg'), 'Controllo…');
+  try {
+    const book = await api('GET', `/api/books/${encodeURIComponent(isbn)}`);
+    if (seq !== checkSeq) return;
+    say($('scan-msg'), '');
+    verdict(true, book);
+    buzz(200);
+  } catch (e) {
+    if (seq !== checkSeq) return;
+    if (e.status !== 404) { $('verdict').hidden = true; say($('scan-msg'), e.message, true); return; }
+    say($('scan-msg'), '');
+    const norm = isbn.replace(/[\s-]/g, '');
+    verdict(false, { isbn: norm });
+    buzz([80, 60, 80]);
+    api('GET', `/api/lookup/${encodeURIComponent(norm)}`).then((f) => {
+      if (seq === checkSeq && f.title) verdict(false, f);
+    }).catch(() => {});
+  }
+}
+
 async function submitIsbn(isbn) {
+  if (mode === 'check') return checkIsbn(isbn);
+  $('verdict').hidden = true;
   say($('scan-msg'), 'Cerco…');
   try {
     const r = await api('POST', '/api/books', { isbn });
@@ -68,10 +124,10 @@ async function startCamera() {
     if (!scanning) return;
     try {
       const codes = await detector.detect($('video'));
-      if (codes.length) {
-        stopCamera();
-        await submitIsbn(codes[0].rawValue);
-        return;
+      if (codes.length && codes[0].rawValue !== lastCode) {
+        lastCode = codes[0].rawValue;
+        if (mode === 'check') checkIsbn(lastCode);
+        else { stopCamera(); await submitIsbn(lastCode); return; }
       }
     } catch { /* fotogramma non pronto */ }
     setTimeout(tick, 300);
@@ -81,6 +137,7 @@ async function startCamera() {
 
 function stopCamera() {
   scanning = false;
+  lastCode = null;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null;
   $('video').hidden = true;
@@ -145,6 +202,17 @@ $('card-again').addEventListener('click', async () => {
 });
 $('tab-scan').addEventListener('click', () => show('scan'));
 $('tab-lib').addEventListener('click', loadLibrary);
+$('mode-add').addEventListener('click', () => setMode('add'));
+$('mode-check').addEventListener('click', () => setMode('check'));
+$('verdict-add').addEventListener('click', async () => {
+  const b = $('verdict-add');
+  b.disabled = true;
+  try {
+    const r = await api('POST', '/api/books', { isbn: b.dataset.isbn });
+    verdict(true, r.book);
+    say($('scan-msg'), r.status === 'saved' ? 'Salvato' : 'Già in libreria');
+  } catch (e) { say($('scan-msg'), e.message, true); b.disabled = false; }
+});
 $('camera').addEventListener('click', () => { if (!scanning) startCamera(); });
 $('manual-form').addEventListener('submit', (e) => { e.preventDefault(); submitIsbn($('isbn').value); });
 $('login-form').addEventListener('submit', async (e) => {
@@ -158,6 +226,7 @@ $('login-form').addEventListener('submit', async (e) => {
 });
 $('logout').addEventListener('click', async () => { await api('POST', '/api/logout').catch(() => {}); showLogin(); });
 
+setMode(mode);
 api('GET', '/api/auth/status').then((s) => (s.authenticated ? show('scan') : showLogin())).catch(showLogin);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
