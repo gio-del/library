@@ -18,4 +18,12 @@ article img, #grid img { max-width: 100%; max-height: 14rem; border-radius: 4px;
 #grid li { background: #fff; border-radius: 8px; padding: .5rem; display: flex; flex-direction: column; gap: .3rem; align-items: center; text-align: center; }
 #grid .t { font-weight: 600; overflow-wrap: anywhere; }
 #grid .a { font-size: .85rem; color: #555; }
+#modes { display: flex; gap: .5rem; margin-bottom: .6rem; }
+#modes button { flex: 1; min-height: 56px; font-size: 1.1rem; background: #4b5d72; }
+#modes button[aria-pressed="true"] { background: #3b6ea5; outline: 3px solid #1d3f66; }
+#verdict { border-radius: 8px; padding: 1rem; color: #fff; }
+#verdict.yes { background: #2e7d32; }
+#verdict.no { background: #a53b3b; }
+#verdict h2 { font-size: 2rem; margin: 0 0 .5rem; }
+#verdict p { margin: .2rem 0; }
 [hidden] { display: none !important; }

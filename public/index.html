@@ -28,13 +28,24 @@
     </form>
   </section>
   <section id="scan" hidden>
+    <div id="modes" role="group" aria-label="Modalità">
+      <button id="mode-add" type="button" aria-pressed="true">Aggiungi</button>
+      <button id="mode-check" type="button" aria-pressed="false">Controlla</button>
+    </div>
     <video id="video" playsinline muted hidden></video>
     <button id="camera" type="button">Apri la fotocamera</button>
     <form id="manual-form">
       <label>ISBN <input id="isbn" inputmode="numeric" autocomplete="off" placeholder="978…"></label>
-      <button type="submit">Cerca e salva</button>
+      <button type="submit">Cerca</button>
     </form>
     <p id="scan-msg" class="msg" role="status"></p>
+    <article id="verdict" hidden>
+      <h2 id="verdict-text"></h2>
+      <img id="verdict-cover" alt="" hidden>
+      <p id="verdict-title"></p>
+      <p id="verdict-authors"></p>
+      <button id="verdict-add" type="button" hidden>Aggiungi</button>
+    </article>
     <article id="card" hidden>
       <img id="card-cover" alt="">
       <h2 id="card-title"></h2>
