@@ -19,3 +19,4 @@ article img, #grid img { max-width: 100%; max-height: 14rem; border-radius: 4px;
 #grid .t { font-weight: 600; overflow-wrap: anywhere; }
 #grid .a { font-size: .85rem; color: #555; }
 [hidden] { display: none !important; }
+#grid .ph { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 8rem; padding: .5rem; box-sizing: border-box; background: #dde3ea; border-radius: 4px; font-weight: 600; overflow-wrap: anywhere; }
