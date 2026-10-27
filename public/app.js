@@ -9,6 +9,7 @@ let current = null;
 let checkSeq = 0;
 let libBooks = [];
 let filter = 'all';
+let detailBook = null;
 
 async function api(method, url, body) {
   const res = await fetch(url, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
@@ -21,7 +22,7 @@ async function api(method, url, body) {
 function say(el, text, err) { el.textContent = text; el.classList.toggle('err', !!err); }
 
 function show(name) {
-  for (const s of ['login', 'scan', 'lib']) $(s).hidden = s !== name;
+  for (const s of ['login', 'scan', 'lib', 'detail']) $(s).hidden = s !== name;
   $('nav').hidden = name === 'login';
   if (name !== 'scan') stopCamera();
 }
@@ -182,6 +183,8 @@ function renderLibrary() {
       del.disabled = true;
       try { await api('DELETE', `/api/books/${b.isbn}`); libBooks = libBooks.filter((x) => x.isbn !== b.isbn); renderLibrary(); } catch (e) { say($('lib-msg'), e.message, true); del.disabled = false; }
     });
+    li.classList.add('open-card');
+    li.addEventListener('click', (ev) => { if (ev.target.closest && ev.target.closest('button')) return; openDetail(b); });
     li.append(badge, t, a, rd);
     if (b.lookup === 'failed' || !b.cover) {
       const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Cerca di nuovo';
@@ -197,6 +200,103 @@ function renderLibrary() {
   }
 }
 
+// ISBN-10 ricavato dall'ISBN-13 con prefisso 978 (con 979 non esiste).
+function isbn10Of(isbn13) {
+  if (!/^978\d{10}$/.test(isbn13)) return '';
+  const core = isbn13.slice(3, 12);
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(core[i]) * (10 - i);
+  const c = (11 - (sum % 11)) % 11;
+  return core + (c === 10 ? 'X' : String(c));
+}
+
+const SOURCES = { openlibrary: 'Open Library', sbn: 'SBN', amazon: 'Amazon' };
+
+function detailRows(b) {
+  const added = b.added && !Number.isNaN(Date.parse(b.added)) ? new Date(b.added).toLocaleDateString('it-IT') : '';
+  return [
+    ['Autori', (b.authors || []).join(', ')], ['Edizione', b.edition], ['Editore', b.publisher], ['Anno', b.year],
+    ['Collana', b.series], ['Pagine', b.pages], ['Lingua', b.language],
+    ['ISBN-13', b.isbn], ['ISBN-10', isbn10Of(b.isbn)],
+    ['Fonte dei dati', SOURCES[b.source] || b.source], ['Aggiunto il', added],
+  ].filter(([, v]) => v);
+}
+
+function paintDetail(b) {
+  detailBook = b;
+  $('d-title').textContent = b.title || 'Titolo sconosciuto';
+  $('d-cover').hidden = !b.cover;
+  if (b.cover) $('d-cover').src = `/covers/${b.cover}?v=${Date.now()}`;
+  $('d-state').textContent = b.read ? 'Letto' : 'Da leggere';
+  $('d-state').className = b.read ? 'badge read' : 'badge';
+  $('d-read').textContent = b.read ? 'Segna come da leggere' : 'Segna come letto';
+  const dl = $('d-fields');
+  dl.replaceChildren();
+  for (const [k, v] of detailRows(b)) {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = String(v);
+    dl.append(dt, dd);
+  }
+}
+
+function openDetail(b) {
+  show('detail');
+  say($('d-msg'), '');
+  $('d-form').hidden = true;
+  $('d-actions').hidden = false;
+  paintDetail(b);
+}
+
+const EDIT = ['title', 'edition', 'publisher', 'year', 'series', 'pages', 'language'];
+
+function editDetail() {
+  for (const k of EDIT) $(`e-${k}`).value = detailBook[k] || '';
+  $('e-authors').value = (detailBook.authors || []).join(', ');
+  $('d-form').hidden = false;
+  $('d-actions').hidden = true;
+}
+
+// Scala e ricodifica in JPEG: il server accetta solo JPEG.
+async function toJpeg(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) => canvas.toBlob((bl) => (bl ? resolve(bl) : reject(new Error('Immagine non leggibile'))), 'image/jpeg', 0.85));
+}
+
+async function saveDetail(ev) {
+  ev.preventDefault();
+  const body = { authors: $('e-authors').value.split(',').map((x) => x.trim()).filter(Boolean) };
+  for (const k of EDIT) body[k] = $(`e-${k}`).value;
+  try {
+    const r = await api('PATCH', `/api/books/${detailBook.isbn}`, body);
+    const i = libBooks.findIndex((x) => x.isbn === r.book.isbn);
+    if (i >= 0) libBooks[i] = r.book;
+    openDetail(r.book);
+    say($('d-msg'), 'Salvato');
+  } catch (e) { say($('d-msg'), e.message, true); }
+}
+
+async function changeCover() {
+  const file = $('d-cover-file').files && $('d-cover-file').files[0];
+  if (!file) return;
+  say($('d-msg'), 'Carico la copertina…');
+  try {
+    const blob = await toJpeg(file);
+    const res = await fetch(`/api/books/${detailBook.isbn}/cover`, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: blob });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    const i = libBooks.findIndex((x) => x.isbn === data.book.isbn);
+    if (i >= 0) libBooks[i] = data.book;
+    paintDetail(data.book);
+    say($('d-msg'), 'Copertina cambiata');
+  } catch (e) { say($('d-msg'), e.message, true); }
+  $('d-cover-file').value = '';
+}
+
 async function loadLibrary() {
   show('lib');
   try {
@@ -206,6 +306,23 @@ async function loadLibrary() {
 }
 
 for (const [id, f] of [['f-all', 'all'], ['f-toread', 'toread'], ['f-read', 'read']]) $(id).addEventListener('click', () => { filter = f; renderLibrary(); });
+$('d-back').addEventListener('click', () => { renderLibrary(); show('lib'); });
+$('d-edit').addEventListener('click', editDetail);
+$('d-cancel').addEventListener('click', () => { $('d-form').hidden = true; $('d-actions').hidden = false; });
+$('d-form').addEventListener('submit', saveDetail);
+$('d-cover-file').addEventListener('change', changeCover);
+$('d-read').addEventListener('click', async () => {
+  try { const b = await toggleRead(detailBook, $('d-read')); if (b) paintDetail(b); } catch (e) { say($('d-msg'), e.message, true); }
+});
+$('d-delete').addEventListener('click', async () => {
+  if (!confirm(`Eliminare «${detailBook.title || detailBook.isbn}»?`)) return;
+  try {
+    await api('DELETE', `/api/books/${detailBook.isbn}`);
+    libBooks = libBooks.filter((x) => x.isbn !== detailBook.isbn);
+    renderLibrary();
+    show('lib');
+  } catch (e) { say($('d-msg'), e.message, true); }
+});
 $('card-read').addEventListener('click', async () => {
   if (!cardBook) return;
   try { fillCard(await toggleRead(cardBook, $('card-read'))); } catch (e) { say($('scan-msg'), e.message, true); }

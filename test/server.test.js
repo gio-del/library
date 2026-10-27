@@ -207,3 +207,26 @@ test('letto / non letto: default da leggere, PATCH, persistenza, tocchi ripetuti
   assert.strictEqual((await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json()).read, true);
   assert.strictEqual((await (await call('PATCH', `/api/books/${isbn}`, { read: false }, sid)).json()).book.read, false);
 });
+
+test('scheda: modifica campi con PATCH e cambio copertina con PUT', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  const sid = await login();
+  const isbn = '9780306406157';
+  await call('POST', '/api/books', { isbn }, sid);
+  const r = await call('PATCH', `/api/books/${isbn}`, { title: ' Nuovo ', authors: ['A', ' ', 'B'], edition: 'Seconda', pages: '320', language: 'it' }, sid);
+  assert.strictEqual(r.status, 200);
+  const b = (await r.json()).book;
+  assert.deepStrictEqual([b.title, b.authors, b.edition, b.pages, b.language, b.read], ['Nuovo', ['A', 'B'], 'Seconda', '320', 'it', false]);
+  assert.strictEqual((await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json()).edition, 'Seconda');
+  for (const bad of [{ title: 5 }, { authors: 'A' }, { authors: [1] }]) assert.strictEqual((await call('PATCH', `/api/books/${isbn}`, bad, sid)).status, 400);
+
+  const base = (await call('GET', '/api/auth/status')).url.replace(/\/api.*/, '');
+  const up = (body) => fetch(`${base}/api/books/${isbn}/cover`, { method: 'PUT', headers: { cookie: sid, 'content-type': 'image/jpeg' }, body });
+  assert.strictEqual((await up(Buffer.from('non una immagine'))).status, 400);
+  const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  assert.strictEqual((await up(jpg)).status, 200);
+  assert.deepStrictEqual(fs.readFileSync(path.join(dataDir, 'covers', `${isbn}.jpg`)), jpg);
+  assert.strictEqual((await up(Buffer.alloc(3 * 1024 * 1024, 0xff))).status, 413);
+  const nobody = await fetch(`${base}/api/books/${isbn}/cover`, { method: 'PUT', body: jpg });
+  assert.strictEqual(nobody.status, 401);
+});
