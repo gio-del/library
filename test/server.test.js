@@ -187,3 +187,23 @@ test('«Cerca di nuovo» su tutti include i libri senza copertina', async (t) =>
   assert.strictEqual(r.retried, 1);
   assert.strictEqual(r.books[0].cover, '9780306406157.jpg');
 });
+
+test('letto / non letto: default da leggere, PATCH, persistenza, tocchi ripetuti, errori', async (t) => {
+  const { call, login } = await start(t);
+  const sid = await login();
+  const isbn = '9780306406157';
+  assert.strictEqual((await call('PATCH', `/api/books/${isbn}`, { read: true })).status, 401);
+  assert.strictEqual((await call('PATCH', `/api/books/${isbn}`, { read: true }, sid)).status, 404);
+  const added = await (await call('POST', '/api/books', { isbn }, sid)).json();
+  assert.strictEqual(added.book.read, false);
+  for (const bad of [{}, { read: 'si' }, { read: 1 }]) assert.strictEqual((await call('PATCH', `/api/books/${isbn}`, bad, sid)).status, 400);
+  for (let i = 0; i < 2; i++) {
+    const r = await call('PATCH', `/api/books/${isbn}`, { read: true }, sid);
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual((await r.json()).book.read, true);
+  }
+  assert.strictEqual((await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json()).read, true);
+  await call('POST', `/api/books/${isbn}/lookup`, undefined, sid);
+  assert.strictEqual((await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json()).read, true);
+  assert.strictEqual((await (await call('PATCH', `/api/books/${isbn}`, { read: false }, sid)).json()).book.read, false);
+});

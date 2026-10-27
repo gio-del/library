@@ -48,11 +48,18 @@
       <h2 id="card-title"></h2>
       <p id="card-authors"></p>
       <p id="card-meta"></p>
+      <p id="card-state" class="badge"></p>
+      <button id="card-read" type="button"></button>
       <button id="card-again" type="button" hidden>Cerca di nuovo</button>
     </article>
   </section>
   <section id="lib" hidden>
     <p id="lib-msg" class="msg" role="status"></p>
+    <div id="filters" role="group" aria-label="Filtro">
+      <button id="f-all" type="button"></button>
+      <button id="f-toread" type="button"></button>
+      <button id="f-read" type="button"></button>
+    </div>
     <button id="retry-all" type="button" hidden>Cerca di nuovo i libri senza dati o copertina</button>
     <ul id="grid"></ul>
   </section>

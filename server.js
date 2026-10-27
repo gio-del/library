@@ -90,7 +90,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
 
   async function addBook(isbn) {
     if (await store.get(isbn)) return { status: 200, body: { status: 'exists', book: await store.get(isbn) } };
-    const book = { isbn, title: '', authors: [], publisher: '', year: '', cover: null, added: new Date(now()).toISOString() };
+    const book = { isbn, title: '', authors: [], publisher: '', year: '', cover: null, read: false, added: new Date(now()).toISOString() };
     await fillBook(book);
     if (!(await store.add(book))) return { status: 200, body: { status: 'exists', book: await store.get(isbn) } };
     return { status: 201, body: { status: 'saved', book } };
@@ -156,6 +156,14 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
         const found = await lookup(isbn, fetchFn);
         return send(res, 200, found ? { isbn, title: found.title, authors: found.authors } : { isbn, title: '', authors: [] });
       } catch { return send(res, 200, { isbn, title: '', authors: [] }); }
+    }
+    const pt = /^\/api\/books\/(\d{13})$/.exec(p);
+    if (req.method === 'PATCH' && pt) {
+      const b = await readJson(req);
+      if (typeof b.read !== 'boolean') return send(res, 400, { error: 'Stato non valido' });
+      const old = await store.get(pt[1]);
+      const book = old && (await store.replace({ ...old, read: b.read }));
+      return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
     }
     const m = /^\/api\/books\/([\d-]{10,17}|\d{9}X)$/.exec(p);
     if (req.method === 'DELETE' && m) {

@@ -75,3 +75,22 @@ test('niente più tasti Controlla/Aggiungi separati né «Cerca e salva»', () =
   assert.ok(!ids.includes('mode-add') && !ids.includes('mode-check'));
   assert.ok(!html.includes('Cerca e salva'));
 });
+
+test('scheda: stato «Da leggere», un tocco lo segna letto e di nuovo da leggere', async () => {
+  const isbn = BOOK.isbn;
+  const { els, calls } = load({
+    [`GET /api/books/${isbn}`]: [200, BOOK],
+    [`PATCH /api/books/${isbn}`]: [200, { book: { ...BOOK, read: true } }],
+  });
+  els.isbn.value = isbn;
+  for (const f of els['manual-form'].listeners.submit) f({ preventDefault() {} });
+  await tick(); await tick();
+  els['verdict-open'].click();
+  assert.equal(els['card-state'].textContent, 'Da leggere');
+  els['card-read'].click();
+  els['card-read'].click();
+  await tick(); await tick();
+  assert.equal(calls.filter((c) => c.startsWith('PATCH')).length, 1);
+  assert.equal(els['card-state'].textContent, 'Letto');
+  assert.match(els['card-read'].textContent, /da leggere/);
+});
