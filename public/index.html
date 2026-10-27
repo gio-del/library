@@ -53,6 +53,32 @@
       <button id="card-again" type="button" hidden>Cerca di nuovo</button>
     </article>
   </section>
+  <section id="detail" hidden>
+    <button id="d-back" type="button">← Torna all’elenco</button>
+    <img id="d-cover" alt="" hidden>
+    <h2 id="d-title"></h2>
+    <p id="d-state" class="badge"></p>
+    <dl id="d-fields"></dl>
+    <p id="d-msg" class="msg" role="status"></p>
+    <form id="d-form" hidden>
+      <label>Titolo <input id="e-title"></label>
+      <label>Autori (separati da virgola) <input id="e-authors"></label>
+      <label>Edizione <input id="e-edition"></label>
+      <label>Editore <input id="e-publisher"></label>
+      <label>Anno <input id="e-year" inputmode="numeric"></label>
+      <label>Collana <input id="e-series"></label>
+      <label>Pagine <input id="e-pages" inputmode="numeric"></label>
+      <label>Lingua <input id="e-language"></label>
+      <button type="submit">Salva</button>
+      <button id="d-cancel" type="button">Annulla</button>
+    </form>
+    <div id="d-actions">
+      <button id="d-read" type="button"></button>
+      <button id="d-edit" type="button">Modifica</button>
+      <label id="d-cover-pick" class="btn">Cambia copertina <input id="d-cover-file" type="file" accept="image/*" hidden></label>
+      <button id="d-delete" type="button" class="danger">Elimina</button>
+    </div>
+  </section>
   <section id="lib" hidden>
     <p id="lib-msg" class="msg" role="status"></p>
     <div id="filters" role="group" aria-label="Filtro">

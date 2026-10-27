@@ -9,6 +9,9 @@ const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
 
 const MAX_BODY = 4096;
+const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
+// campi modificabili a mano dalla scheda, con la lunghezza massima
+const EDITABLE = { title: 300, authors: 200, publisher: 200, year: 20, edition: 200, series: 200, pages: 10, language: 50 };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml',
 };
@@ -66,6 +69,20 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
           if (v && typeof v === 'object' && !Array.isArray(v)) resolve(v); else throw new Error('x');
         } catch { reject(Object.assign(new Error('JSON non valido'), { status: 400 })); }
       });
+      req.on('error', reject);
+    });
+  }
+
+  function readRaw(req, max) {
+    return new Promise((resolve, reject) => {
+      let size = 0;
+      const chunks = [];
+      req.on('data', (c) => {
+        size += c.length;
+        if (size > max) { if (size - c.length <= max) reject(Object.assign(new Error('troppo grande'), { status: 413 })); return; }
+        chunks.push(c);
+      });
+      req.on('end', () => { if (size <= max) resolve(Buffer.concat(chunks)); });
       req.on('error', reject);
     });
   }
@@ -160,10 +177,36 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     const pt = /^\/api\/books\/(\d{13})$/.exec(p);
     if (req.method === 'PATCH' && pt) {
       const b = await readJson(req);
-      if (typeof b.read !== 'boolean') return send(res, 400, { error: 'Stato non valido' });
+      const patch = {};
+      if ('read' in b) {
+        if (typeof b.read !== 'boolean') return send(res, 400, { error: 'Stato non valido' });
+        patch.read = b.read;
+      }
+      for (const [k, max] of Object.entries(EDITABLE)) {
+        if (!(k in b)) continue;
+        if (k === 'authors') {
+          if (!Array.isArray(b.authors) || b.authors.length > 20 || b.authors.some((a) => typeof a !== 'string')) return send(res, 400, { error: 'Autori non validi' });
+          patch.authors = b.authors.map((a) => a.trim().slice(0, max)).filter(Boolean);
+        } else {
+          if (typeof b[k] !== 'string') return send(res, 400, { error: 'Campo non valido' });
+          patch[k] = b[k].trim().slice(0, max);
+        }
+      }
+      if (!Object.keys(patch).length) return send(res, 400, { error: 'Stato non valido' });
       const old = await store.get(pt[1]);
-      const book = old && (await store.replace({ ...old, read: b.read }));
+      const book = old && (await store.replace({ ...old, ...patch }));
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
+    }
+    const cv = /^\/api\/books\/(\d{13})\/cover$/.exec(p);
+    if (req.method === 'PUT' && cv) {
+      const img = await readRaw(req, MAX_COVER_UPLOAD);
+      if (img.length < 4 || img[0] !== 0xff || img[1] !== 0xd8 || img[2] !== 0xff) return send(res, 400, { error: 'Immagine non valida (serve un JPEG)' });
+      const old = await store.get(cv[1]);
+      if (!old) return send(res, 404, { error: 'Non trovato' });
+      const book = { ...old };
+      await saveCover(book, img);
+      if (!book.cover) return send(res, 500, { error: 'Copertina non salvata' });
+      return send(res, 200, { book: await store.replace(book) });
     }
     const m = /^\/api\/books\/([\d-]{10,17}|\d{9}X)$/.exec(p);
     if (req.method === 'DELETE' && m) {
