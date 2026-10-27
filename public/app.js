@@ -2,8 +2,10 @@
 const $ = (id) => document.getElementById(id);
 let stream = null;
 let scanning = false;
-let mode = localStorage.getItem('mode') === 'check' ? 'check' : 'add';
 let lastCode = null;
+let lastSeen = 0;
+let saving = false;
+let current = null;
 let checkSeq = 0;
 
 async function api(method, url, body) {
@@ -37,18 +39,6 @@ function fillCard(book) {
 
 let cardBook = null;
 
-function setMode(m) {
-  mode = m;
-  try { localStorage.setItem('mode', m); } catch { /* storage non disponibile */ }
-  $('mode-add').setAttribute('aria-pressed', String(m === 'add'));
-  $('mode-check').setAttribute('aria-pressed', String(m === 'check'));
-  $('manual-form').querySelector('button').textContent = m === 'check' ? 'Controlla' : 'Cerca e salva';
-  $('verdict').hidden = true;
-  $('card').hidden = true;
-  lastCode = null;
-  say($('scan-msg'), '');
-}
-
 function buzz(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
 
 function verdict(yes, book) {
@@ -60,9 +50,19 @@ function verdict(yes, book) {
   $('verdict-authors').textContent = (book.authors || []).join(', ');
   $('verdict-cover').hidden = !(yes && book.cover);
   if (yes && book.cover) $('verdict-cover').src = `/covers/${book.cover}`;
+  current = book;
   $('verdict-add').hidden = yes;
-  $('verdict-add').disabled = false;
+  $('verdict-add').disabled = saving;
+  $('verdict-open').hidden = !yes;
   $('verdict-add').dataset.isbn = book.isbn || '';
+}
+
+// ISBN-13 (978/979) con cifra di controllo corretta: scarta addendum, prezzi e altri codici a barre.
+function validIsbn13(code) {
+  if (!/^97[89]\d{10}$/.test(code)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(code[i]) * (i % 2 ? 3 : 1);
+  return String((10 - (sum % 10)) % 10) === code[12];
 }
 
 async function checkIsbn(isbn) {
@@ -88,32 +88,21 @@ async function checkIsbn(isbn) {
   }
 }
 
-async function submitIsbn(isbn) {
-  if (mode === 'check') return checkIsbn(isbn);
-  $('verdict').hidden = true;
-  say($('scan-msg'), 'Cerco…');
-  try {
-    const r = await api('POST', '/api/books', { isbn });
-    fillCard(r.book);
-    const lost = r.book.lookup === 'failed' ? ' (dati non trovati, salvato solo l’ISBN)' : '';
-    say($('scan-msg'), (r.status === 'saved' ? 'Salvato' : 'Già in libreria') + lost);
-  } catch (e) {
-    $('card').hidden = true;
-    say($('scan-msg'), e.message, true);
-  }
-}
-
 async function startCamera() {
   if (!('BarcodeDetector' in window) || !navigator.mediaDevices) {
     say($('scan-msg'), 'Questo browser non legge i codici a barre: scrivi l’ISBN a mano.', true);
     return;
   }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
   } catch {
     say($('scan-msg'), 'Fotocamera non disponibile: scrivi l’ISBN a mano.', true);
     return;
   }
+  try {
+    const [track] = stream.getVideoTracks();
+    await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+  } catch { /* messa a fuoco non regolabile */ }
   const detector = new BarcodeDetector({ formats: ['ean_13'] });
   $('video').srcObject = stream;
   $('video').hidden = false;
@@ -124,11 +113,11 @@ async function startCamera() {
     if (!scanning) return;
     try {
       const codes = await detector.detect($('video'));
-      if (codes.length && codes[0].rawValue !== lastCode) {
-        lastCode = codes[0].rawValue;
-        if (mode === 'check') checkIsbn(lastCode);
-        else { stopCamera(); await submitIsbn(lastCode); return; }
-      }
+      const hit = codes.map((c) => String(c.rawValue).replace(/\D/g, '')).find(validIsbn13);
+      if (hit) {
+        lastSeen = Date.now();
+        if (hit !== lastCode) { lastCode = hit; checkIsbn(hit); }
+      } else if (lastCode && Date.now() - lastSeen > 2500) lastCode = null;
     } catch { /* fotogramma non pronto */ }
     setTimeout(tick, 300);
   };
@@ -202,19 +191,21 @@ $('card-again').addEventListener('click', async () => {
 });
 $('tab-scan').addEventListener('click', () => show('scan'));
 $('tab-lib').addEventListener('click', loadLibrary);
-$('mode-add').addEventListener('click', () => setMode('add'));
-$('mode-check').addEventListener('click', () => setMode('check'));
+$('verdict-open').addEventListener('click', () => { if (current) fillCard(current); });
 $('verdict-add').addEventListener('click', async () => {
   const b = $('verdict-add');
+  if (saving) return;
+  saving = true;
   b.disabled = true;
   try {
     const r = await api('POST', '/api/books', { isbn: b.dataset.isbn });
+    saving = false;
     verdict(true, r.book);
     say($('scan-msg'), r.status === 'saved' ? 'Salvato' : 'Già in libreria');
-  } catch (e) { say($('scan-msg'), e.message, true); b.disabled = false; }
+  } catch (e) { saving = false; say($('scan-msg'), e.message, true); b.disabled = false; }
 });
 $('camera').addEventListener('click', () => { if (!scanning) startCamera(); });
-$('manual-form').addEventListener('submit', (e) => { e.preventDefault(); submitIsbn($('isbn').value); });
+$('manual-form').addEventListener('submit', (e) => { e.preventDefault(); checkIsbn($('isbn').value); });
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -226,7 +217,6 @@ $('login-form').addEventListener('submit', async (e) => {
 });
 $('logout').addEventListener('click', async () => { await api('POST', '/api/logout').catch(() => {}); showLogin(); });
 
-setMode(mode);
 api('GET', '/api/auth/status').then((s) => (s.authenticated ? show('scan') : showLogin())).catch(showLogin);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
