@@ -31,7 +31,7 @@ function fillCard(book) {
   $('card-authors').textContent = book.authors.join(', ');
   $('card-meta').textContent = [book.publisher, book.year, book.isbn].filter(Boolean).join(' · ');
   $('card-cover').hidden = !book.cover;
-  $('card-again').hidden = book.lookup !== 'failed';
+  $('card-again').hidden = book.lookup !== 'failed' && !!book.cover;
   if (book.cover) $('card-cover').src = `/covers/${book.cover}`;
 }
 
@@ -150,7 +150,7 @@ async function loadLibrary() {
     say($('lib-msg'), books.length ? `${books.length} libri` : 'La libreria è vuota');
     const grid = $('grid');
     grid.replaceChildren();
-    $('retry-all').hidden = !books.some((b) => b.lookup === 'failed');
+    $('retry-all').hidden = !books.some((b) => b.lookup === 'failed' || !b.cover);
     for (const b of books) {
       const li = document.createElement('li');
       if (b.cover) { const img = document.createElement('img'); img.src = `/covers/${b.cover}`; img.alt = ''; li.append(img); }
@@ -164,7 +164,7 @@ async function loadLibrary() {
         try { await api('DELETE', `/api/books/${b.isbn}`); li.remove(); } catch (e) { say($('lib-msg'), e.message, true); del.disabled = false; }
       });
       li.append(t, a);
-      if (b.lookup === 'failed') {
+      if (b.lookup === 'failed' || !b.cover) {
         const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Cerca di nuovo';
         again.addEventListener('click', async () => {
           again.disabled = true;
@@ -181,11 +181,11 @@ async function loadLibrary() {
 
 $('retry-all').addEventListener('click', async () => {
   $('retry-all').disabled = true;
-  say($('lib-msg'), 'Cerco i libri senza dati…');
+  say($('lib-msg'), 'Cerco i libri incompleti…');
   try {
     const r = await api('POST', '/api/books/lookup-failed');
     await loadLibrary();
-    say($('lib-msg'), `Trovati i dati di ${r.found} libri su ${r.retried}`);
+    say($('lib-msg'), `Aggiornati ${r.found} libri su ${r.retried}`);
   } catch (e) { say($('lib-msg'), e.message, true); }
   $('retry-all').disabled = false;
 });
@@ -196,7 +196,7 @@ $('card-again').addEventListener('click', async () => {
   try {
     const r = await api('POST', `/api/books/${cardBook.isbn}/lookup`);
     fillCard(r.book);
-    say($('scan-msg'), r.book.lookup === 'failed' ? 'Dati ancora non trovati' : 'Dati trovati');
+    say($('scan-msg'), r.book.lookup === 'failed' ? 'Dati ancora non trovati' : r.book.cover ? 'Trovato' : 'Copertina ancora non trovata');
   } catch (e) { say($('scan-msg'), e.message, true); }
   $('card-again').disabled = false;
 });

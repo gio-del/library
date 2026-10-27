@@ -85,3 +85,48 @@ test('«Cerca di nuovo» aggiorna un libro fallito; senza login 401; ISBN ignoto
   const [b] = await (await call('GET', '/api/books', undefined, c)).json();
   assert.deepStrictEqual([b.title, b.authors, b.source, b.lookup], ['Persuasione', ['Jane Austen'], 'sbn', undefined]);
 });
+
+const { fetchCover, toIsbn10 } = require('../lib/lookup');
+const BIG_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(3000, 1)]);
+const GIF43 = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(37)]);
+
+function coverFetch({ amazon, calls }) {
+  return (url) => {
+    const u = String(url);
+    calls.push(u);
+    if (u.includes('images-na.ssl-images-amazon.com')) return amazon();
+    return new Response('', { status: 404 });
+  };
+}
+
+test('toIsbn10: conversione, cifra X, 979 senza ISBN-10', () => {
+  assert.strictEqual(toIsbn10('9780306406157'), '0306406152');
+  assert.strictEqual(toIsbn10('9780804429573'), '080442957X');
+  assert.strictEqual(toIsbn10('9791234567896'), null);
+  assert.strictEqual(toIsbn10('abc'), null);
+});
+
+test('copertina: Open Library senza, Amazon JPEG accettato', async () => {
+  const calls = [];
+  const buf = await fetchCover('9780306406157', coverFetch({ amazon: () => new Response(BIG_JPEG), calls }));
+  assert.ok(buf && buf.equals(BIG_JPEG));
+  assert.ok(calls.some((u) => u.endsWith('/images/P/0306406152.01.L.jpg')));
+});
+
+test('copertina: la GIF segnaposto da 43 byte di Amazon è rifiutata', async () => {
+  const calls = [];
+  assert.strictEqual(await fetchCover('9780306406157', coverFetch({ amazon: () => new Response(GIF43), calls })), null);
+  // anche un JPEG troppo piccolo
+  assert.strictEqual(await fetchCover('9780306406157', coverFetch({ amazon: () => new Response(Buffer.from([0xff, 0xd8, 0xff, 0xd9])), calls })), null);
+});
+
+test('copertina: un ISBN 979 non interroga Amazon', async () => {
+  const calls = [];
+  assert.strictEqual(await fetchCover('9791234567896', coverFetch({ amazon: () => new Response(BIG_JPEG), calls })), null);
+  assert.ok(!calls.some((u) => u.includes('amazon')));
+});
+
+test('copertina: errore di Amazon = nessuna copertina', async () => {
+  const calls = [];
+  assert.strictEqual(await fetchCover('9780306406157', coverFetch({ amazon: timeout, calls })), null);
+});

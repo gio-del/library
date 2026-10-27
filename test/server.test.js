@@ -19,10 +19,10 @@ function fakeFetch(url) {
   return new Response('', { status: 404 });
 }
 
-async function start(t) {
+async function start(t, fetchFn = fakeFetch) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lib-srv-'));
   const config = readConfig({ DATA_DIR: dataDir, AUTH_PASSWORD: 'segreto', PORT: '0' });
-  const server = createServer({ config, fetchFn: fakeFetch });
+  const server = createServer({ config, fetchFn });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -151,4 +151,39 @@ test('GET libro e anteprima: presente, ISBN-10 equivalente, assente, non valido,
   assert.deepStrictEqual(await miss.json(), { isbn: '9781234567897', title: '', authors: [] });
   assert.strictEqual(fs.readFileSync(file, 'utf8'), before);
   assert.strictEqual(fs.existsSync(path.join(dataDir, 'covers', '9780804429573.jpg')), false);
+});
+
+test('«Cerca di nuovo» su un libro con dati ma senza copertina la aggiunge', async (t) => {
+  let amazonUp = false;
+  const f = (url) => {
+    const u = String(url);
+    if (u.includes('images-na.ssl-images-amazon.com')) return amazonUp ? new Response(Buffer.concat([JPEG, Buffer.alloc(2000)])) : new Response('', { status: 404 });
+    return fakeFetch(u.replace('covers.openlibrary.org', 'nessuna.invalid'));
+  };
+  const { call, login, dataDir } = await start(t, f);
+  const sid = await login();
+  const added = await (await call('POST', '/api/books', { isbn: '9780306406157' }, sid)).json();
+  assert.strictEqual(added.book.cover, null);
+  assert.strictEqual(added.book.lookup, undefined);
+  amazonUp = true;
+  const r = await (await call('POST', '/api/books/9780306406157/lookup', undefined, sid)).json();
+  assert.strictEqual(r.book.cover, '9780306406157.jpg');
+  assert.strictEqual(r.book.title, 'Titolo <b>');
+  assert.ok(fs.existsSync(path.join(dataDir, 'covers', '9780306406157.jpg')));
+});
+
+test('«Cerca di nuovo» su tutti include i libri senza copertina', async (t) => {
+  let amazonUp = false;
+  const f = (url) => {
+    const u = String(url);
+    if (u.includes('images-na.ssl-images-amazon.com')) return amazonUp ? new Response(Buffer.concat([JPEG, Buffer.alloc(2000)])) : new Response('', { status: 404 });
+    return fakeFetch(u.replace('covers.openlibrary.org', 'nessuna.invalid'));
+  };
+  const { call, login } = await start(t, f);
+  const sid = await login();
+  await call('POST', '/api/books', { isbn: '9780306406157' }, sid);
+  amazonUp = true;
+  const r = await (await call('POST', '/api/books/lookup-failed', undefined, sid)).json();
+  assert.strictEqual(r.retried, 1);
+  assert.strictEqual(r.books[0].cover, '9780306406157.jpg');
 });
