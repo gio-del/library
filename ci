@@ -1,0 +1,12 @@
+#!/bin/sh
+# CI del Project: nessun segreto, esce al primo controllo fallito.
+set -eu
+cd "$(dirname "$0")"
+
+echo "== sintassi =="
+for f in server.js lib/*.js public/*.js; do
+  [ -f "$f" ] && node --check "$f"
+done
+
+echo "== test =="
+node --test
