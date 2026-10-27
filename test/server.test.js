@@ -230,3 +230,23 @@ test('scheda: modifica campi con PATCH e cambio copertina con PUT', async (t) =>
   const nobody = await fetch(`${base}/api/books/${isbn}/cover`, { method: 'PUT', body: jpg });
   assert.strictEqual(nobody.status, 401);
 });
+
+test('note: salvataggio, ricarica e versione sovrascritta recuperabile', async (t) => {
+  const { call, login } = await start(t);
+  assert.strictEqual((await call('GET', '/api/notes')).status, 401);
+  const c = await login();
+  let r = await (await call('GET', '/api/notes', null, c)).json();
+  assert.deepStrictEqual([r.text, r.rev], ['', 0]);
+  r = await (await call('PUT', '/api/notes', { text: 'Dune', rev: 0 }, c)).json();
+  assert.strictEqual(r.rev, 1);
+  assert.strictEqual(r.overwritten, false);
+  r = await (await call('PUT', '/api/notes', { text: 'Dune\nEmma', rev: 1 }, c)).json();
+  assert.strictEqual(r.history.length, 0);
+  // secondo dispositivo, ancora fermo alla revisione 1
+  r = await (await call('PUT', '/api/notes', { text: 'Altro', rev: 1 }, c)).json();
+  assert.strictEqual(r.overwritten, true);
+  assert.strictEqual(r.history[0].text, 'Dune\nEmma');
+  r = await (await call('GET', '/api/notes', null, c)).json();
+  assert.strictEqual(r.text, 'Altro');
+  assert.strictEqual((await call('PUT', '/api/notes', { text: 5, rev: 0 }, c)).status, 400);
+});

@@ -5,6 +5,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { normalize } = require('./lib/isbn');
 const { createStore } = require('./lib/store');
+const { createNotes, MAX_TEXT } = require('./lib/notes');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
 
@@ -38,6 +39,7 @@ function readConfig(env) {
 
 function createServer({ config, fetchFn = fetch, now = Date.now }) {
   const store = createStore(config.dataDir);
+  const notes = createNotes(config.dataDir);
   const auth = createAuth({ user: config.user, password: config.password, now });
   const coversDir = path.join(config.dataDir, 'covers');
   const publicDir = path.join(__dirname, 'public');
@@ -53,17 +55,17 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     return m && m[1];
   }
 
-  function readJson(req) {
+  function readJson(req, max = MAX_BODY) {
     return new Promise((resolve, reject) => {
       let size = 0;
       const chunks = [];
       req.on('data', (c) => {
         size += c.length;
-        if (size > MAX_BODY) { if (size - c.length <= MAX_BODY) reject(Object.assign(new Error('troppo grande'), { status: 413 })); return; }
+        if (size > max) { if (size - c.length <= max) reject(Object.assign(new Error('troppo grande'), { status: 413 })); return; }
         chunks.push(c);
       });
       req.on('end', () => {
-        if (size > MAX_BODY) return;
+        if (size > max) return;
         try {
           const v = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
           if (v && typeof v === 'object' && !Array.isArray(v)) resolve(v); else throw new Error('x');
@@ -140,6 +142,12 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     if (req.method === 'POST' && p === '/api/logout') {
       auth.logout(token(req));
       return send(res, 200, { ok: true }, { 'set-cookie': 'sid=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' });
+    }
+    if (p === '/api/notes' && req.method === 'GET') return send(res, 200, await notes.get());
+    if (p === '/api/notes' && req.method === 'PUT') {
+      const b = await readJson(req, 4 * MAX_TEXT);
+      if (typeof b.text !== 'string' || b.text.length > MAX_TEXT || !Number.isInteger(b.rev)) return send(res, 400, { error: 'Note non valide' });
+      return send(res, 200, await notes.put(b.text, b.rev, new Date(now()).toISOString()));
     }
     if (req.method === 'GET' && p === '/api/books') return send(res, 200, await store.list());
     if (req.method === 'POST' && p === '/api/books') {
