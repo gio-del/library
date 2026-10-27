@@ -7,6 +7,8 @@ let lastSeen = 0;
 let saving = false;
 let current = null;
 let checkSeq = 0;
+let libBooks = [];
+let filter = 'all';
 
 async function api(method, url, body) {
   const res = await fetch(url, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
@@ -35,6 +37,25 @@ function fillCard(book) {
   $('card-cover').hidden = !book.cover;
   $('card-again').hidden = book.lookup !== 'failed' && !!book.cover;
   if (book.cover) $('card-cover').src = `/covers/${book.cover}`;
+  paintState(book);
+}
+
+function paintState(book) {
+  $('card-state').textContent = book.read ? 'Letto' : 'Da leggere';
+  $('card-state').className = book.read ? 'badge read' : 'badge';
+  $('card-read').textContent = book.read ? 'Segna come da leggere' : 'Segna come letto';
+}
+
+// Cambia lo stato letto/da leggere e riporta il libro aggiornato in scheda ed elenco.
+async function toggleRead(book, btn) {
+  if (btn.disabled) return null;
+  btn.disabled = true;
+  try {
+    const r = await api('PATCH', `/api/books/${book.isbn}`, { read: !book.read });
+    const i = libBooks.findIndex((x) => x.isbn === r.book.isbn);
+    if (i >= 0) libBooks[i] = r.book;
+    return r.book;
+  } finally { btn.disabled = false; }
 }
 
 let cardBook = null;
@@ -132,41 +153,63 @@ function stopCamera() {
   $('video').hidden = true;
 }
 
+function renderLibrary() {
+  const n = (f) => libBooks.filter(f).length;
+  const nRead = n((b) => b.read);
+  $('f-all').textContent = `Tutti (${libBooks.length})`;
+  $('f-toread').textContent = `Da leggere (${libBooks.length - nRead})`;
+  $('f-read').textContent = `Letti (${nRead})`;
+  for (const [id, f] of [['f-all', 'all'], ['f-toread', 'toread'], ['f-read', 'read']]) $(id).classList.toggle('on', filter === f);
+  const shown = libBooks.filter((b) => filter === 'all' || (filter === 'read') === !!b.read);
+  say($('lib-msg'), !libBooks.length ? 'La libreria è vuota' : shown.length ? `${shown.length} libri` : 'Nessun libro in questo elenco');
+  const grid = $('grid');
+  grid.replaceChildren();
+  $('retry-all').hidden = !libBooks.some((b) => b.lookup === 'failed' || !b.cover);
+  for (const b of shown) {
+    const li = document.createElement('li');
+    if (b.cover) { const img = document.createElement('img'); img.src = `/covers/${b.cover}`; img.alt = ''; li.append(img); }
+    else { const ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = b.title || b.isbn; li.append(ph); }
+    const badge = document.createElement('span'); badge.className = b.read ? 'badge read' : 'badge'; badge.textContent = b.read ? 'Letto' : 'Da leggere';
+    const t = document.createElement('span'); t.className = 't'; t.textContent = b.title || b.isbn;
+    const a = document.createElement('span'); a.className = 'a'; a.textContent = b.authors.join(', ');
+    const rd = document.createElement('button'); rd.type = 'button'; rd.textContent = b.read ? 'Segna da leggere' : 'Segna letto';
+    rd.addEventListener('click', async () => {
+      try { await toggleRead(b, rd); renderLibrary(); } catch (e) { say($('lib-msg'), e.message, true); }
+    });
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = 'Elimina';
+    del.addEventListener('click', async () => {
+      if (!confirm(`Eliminare «${b.title || b.isbn}»?`)) return;
+      del.disabled = true;
+      try { await api('DELETE', `/api/books/${b.isbn}`); libBooks = libBooks.filter((x) => x.isbn !== b.isbn); renderLibrary(); } catch (e) { say($('lib-msg'), e.message, true); del.disabled = false; }
+    });
+    li.append(badge, t, a, rd);
+    if (b.lookup === 'failed' || !b.cover) {
+      const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Cerca di nuovo';
+      again.addEventListener('click', async () => {
+        again.disabled = true;
+        say($('lib-msg'), 'Cerco…');
+        try { await api('POST', `/api/books/${b.isbn}/lookup`); await loadLibrary(); } catch (e) { say($('lib-msg'), e.message, true); again.disabled = false; }
+      });
+      li.append(again);
+    }
+    li.append(del);
+    grid.append(li);
+  }
+}
+
 async function loadLibrary() {
   show('lib');
   try {
-    const books = await api('GET', '/api/books');
-    say($('lib-msg'), books.length ? `${books.length} libri` : 'La libreria è vuota');
-    const grid = $('grid');
-    grid.replaceChildren();
-    $('retry-all').hidden = !books.some((b) => b.lookup === 'failed' || !b.cover);
-    for (const b of books) {
-      const li = document.createElement('li');
-      if (b.cover) { const img = document.createElement('img'); img.src = `/covers/${b.cover}`; img.alt = ''; li.append(img); }
-      else { const ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = b.title || b.isbn; li.append(ph); }
-      const t = document.createElement('span'); t.className = 't'; t.textContent = b.title || b.isbn;
-      const a = document.createElement('span'); a.className = 'a'; a.textContent = b.authors.join(', ');
-      const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = 'Elimina';
-      del.addEventListener('click', async () => {
-        if (!confirm(`Eliminare «${b.title || b.isbn}»?`)) return;
-        del.disabled = true;
-        try { await api('DELETE', `/api/books/${b.isbn}`); li.remove(); } catch (e) { say($('lib-msg'), e.message, true); del.disabled = false; }
-      });
-      li.append(t, a);
-      if (b.lookup === 'failed' || !b.cover) {
-        const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Cerca di nuovo';
-        again.addEventListener('click', async () => {
-          again.disabled = true;
-          say($('lib-msg'), 'Cerco…');
-          try { await api('POST', `/api/books/${b.isbn}/lookup`); await loadLibrary(); } catch (e) { say($('lib-msg'), e.message, true); again.disabled = false; }
-        });
-        li.append(again);
-      }
-      li.append(del);
-      grid.append(li);
-    }
+    libBooks = await api('GET', '/api/books');
+    renderLibrary();
   } catch (e) { if (e.status !== 401) say($('lib-msg'), e.message, true); }
 }
+
+for (const [id, f] of [['f-all', 'all'], ['f-toread', 'toread'], ['f-read', 'read']]) $(id).addEventListener('click', () => { filter = f; renderLibrary(); });
+$('card-read').addEventListener('click', async () => {
+  if (!cardBook) return;
+  try { fillCard(await toggleRead(cardBook, $('card-read'))); } catch (e) { say($('scan-msg'), e.message, true); }
+});
 
 $('retry-all').addEventListener('click', async () => {
   $('retry-all').disabled = true;
