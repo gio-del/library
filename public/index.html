@@ -63,6 +63,7 @@
     <form id="d-form" hidden>
       <label>Titolo <input id="e-title"></label>
       <label>Autori (separati da virgola) <input id="e-authors"></label>
+      <label>Generi (separati da virgola) <input id="e-genres"></label>
       <label>Edizione <input id="e-edition"></label>
       <label>Editore <input id="e-publisher"></label>
       <label>Anno <input id="e-year" inputmode="numeric"></label>
@@ -86,7 +87,9 @@
       <button id="f-toread" type="button"></button>
       <button id="f-read" type="button"></button>
     </div>
+    <div id="genres" role="group" aria-label="Genere"></div>
     <button id="retry-all" type="button" hidden>Cerca di nuovo i libri senza dati o copertina</button>
+    <button id="reclassify" type="button">Rileggi i generi (senza toccare quelli corretti)</button>
     <ul id="grid"></ul>
   </section>
 </main>
