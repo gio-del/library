@@ -40,7 +40,7 @@ function load(routes) {
     return { status: r[0], ok: r[0] < 400, json: async () => r[1] };
   };
   const ctx = { document: { getElementById: (id) => els[id], createElement: () => el('x') }, localStorage: { getItem: () => null, setItem() {} },
-    navigator: {}, window: {}, fetch, setTimeout, confirm: () => true, console };
+    navigator: {}, window: {}, fetch, setTimeout, clearTimeout, confirm: () => true, console };
   vm.runInNewContext(src, ctx);
   return { els, calls };
 }
