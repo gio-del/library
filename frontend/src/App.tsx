@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { ToastProvider } from './components/Toast';
 import { useAuth } from './state/auth';
 import { BooksProvider } from './state/books';
 import { Layout } from './components/Layout';
@@ -15,16 +16,18 @@ export function App() {
   if (status === 'out') return <Login />;
   return (
     <BooksProvider>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/libreria" element={<Library />} />
-          <Route path="/scansiona" element={<Scan />} />
+      <ToastProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/libreria" element={<Library />} />
+            <Route path="/scansiona" element={<Scan />} />
+            <Route path="/note" element={<Notes />} />
+          </Route>
           <Route path="/scansiona/manuale" element={<ManualForm />} />
-          <Route path="/note" element={<Notes />} />
           <Route path="/libro/:isbn" element={<BookDetail />} />
           <Route path="*" element={<Navigate to="/libreria" replace />} />
-        </Route>
-      </Routes>
+        </Routes>
+      </ToastProvider>
     </BooksProvider>
   );
 }

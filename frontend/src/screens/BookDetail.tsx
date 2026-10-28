@@ -1,11 +1,15 @@
+import { ImagePlus, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
 import { bookGenres, bookTitle, hasIsbn, needsRetry } from '../lib/books';
 import { isbn10Of } from '../lib/isbn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
+import { Confirm } from '../components/Confirm';
+import { SubPage } from '../components/SubPage';
+import { useToast } from '../components/Toast';
 import { Badge, Button, Field, Input, Msg, Textarea } from '../components/ui';
 
 const SOURCES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'SBN', amazon: 'Amazon' };
@@ -28,30 +32,30 @@ export function BookDetail() {
   const { isbn = '' } = useParams();
   const nav = useNavigate();
   const loc = useLocation() as { state: { note?: string } | null };
+  const { toast } = useToast();
   const { books, loaded, load, upsert, remove } = useBooks();
   const book = books.find((b) => b.isbn === isbn);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
-  const [msg, setMsg] = useState(loc.state?.note ?? '');
-  const [err, setErr] = useState(false);
+  const [formErr, setFormErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [coverV, setCoverV] = useState(0);
-  const say = (t: string, e = false) => { setMsg(t); setErr(e); };
+  const [askDelete, setAskDelete] = useState(false);
   const lock = useLock();
 
   useEffect(() => { if (!loaded) load().catch(() => {}); }, [loaded, load]);
+  useEffect(() => { if (loc.state?.note) toast(loc.state.note); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!book) return <section><Link to="/libreria">← Torna all’elenco</Link><Msg text={loaded ? 'Libro non trovato' : 'Carico…'} /></section>;
+  if (!book) return <SubPage title="Libro" fallback="/libreria"><Msg text={loaded ? 'Libro non trovato' : 'Carico…'} /></SubPage>;
 
-  async function patch(body: unknown, done: string) {
+  async function patch(body: unknown, done: string): Promise<boolean | undefined> {
     return lock('patch', async () => {
       setBusy(true);
       try {
-        const r = await api<{ book: Book }>('PATCH', `/api/books/${isbn}`, body);
-        upsert(r.book);
-        say(done);
+        upsert((await api<{ book: Book }>('PATCH', `/api/books/${isbn}`, body)).book);
+        if (done) toast(done);
         return true;
-      } catch (e) { say((e as Error).message, true); return false; } finally { setBusy(false); }
+      } catch (e) { toast((e as Error).message, true); return false; } finally { setBusy(false); }
     });
   }
 
@@ -59,11 +63,13 @@ export function BookDetail() {
     const f: Record<string, string> = { authors: (book!.authors || []).join(', '), genres: (book!.genres || []).join(', ') };
     for (const k of EDIT) f[k] = String(book![k] ?? '');
     setForm(f);
+    setFormErr('');
     setEditing(true);
   }
 
   async function save(ev: FormEvent) {
     ev.preventDefault();
+    if (!form.title.trim()) { setFormErr('Il titolo non può essere vuoto'); return; }
     const body: Record<string, unknown> = { authors: list(form.authors) };
     const genres = list(form.genres);
     if (genres.join('|') !== (book!.genres || []).join('|')) body.genres = genres;
@@ -73,67 +79,75 @@ export function BookDetail() {
 
   async function changeCover(file?: File) {
     if (!file) return;
-    say('Carico la copertina…');
-    try {
-      const r = await putCover<{ book: Book }>(isbn, await toJpeg(file));
-      upsert(r.book);
-      setCoverV(Date.now());
-      say('Copertina cambiata');
-    } catch (e) { say((e as Error).message, true); }
+    await lock('cover', async () => {
+      toast('Carico la copertina…');
+      try {
+        upsert((await putCover<{ book: Book }>(isbn, await toJpeg(file))).book);
+        setCoverV(Date.now());
+        toast('Copertina cambiata');
+      } catch (e) { toast((e as Error).message, true); }
+    });
   }
 
   async function again() {
-    setBusy(true);
-    say('Cerco…');
-    try {
-      const r = await api<{ book: Book }>('POST', `/api/books/${isbn}/lookup`);
-      upsert(r.book);
-      say(r.book.lookup === 'failed' ? 'Dati ancora non trovati' : r.book.cover ? 'Trovato' : 'Copertina ancora non trovata');
-    } catch (e) { say((e as Error).message, true); }
-    setBusy(false);
+    await lock('again', async () => {
+      toast('Cerco…');
+      try {
+        const r = await api<{ book: Book }>('POST', `/api/books/${isbn}/lookup`);
+        upsert(r.book);
+        toast(r.book.lookup === 'failed' ? 'Dati ancora non trovati' : r.book.cover ? 'Trovato' : 'Copertina ancora non trovata');
+      } catch (e) { toast((e as Error).message, true); }
+    });
   }
 
   async function del() {
-    if (!confirm(`Eliminare «${bookTitle(book!)}»?`)) return;
-    try { await api('DELETE', `/api/books/${isbn}`); remove(isbn); nav('/libreria'); } catch (e) { say((e as Error).message, true); }
+    await lock('delete', async () => {
+      try { await api('DELETE', `/api/books/${isbn}`); remove(isbn); nav('/libreria', { replace: true }); toast('Libro eliminato'); } catch (e) { toast((e as Error).message, true); }
+    });
   }
 
-  return (
-    <section className="flex flex-col gap-2.5">
-      <Link to="/libreria" className="flex min-h-11 items-center">← Torna all’elenco</Link>
-      {book.cover && <img src={`/covers/${book.cover}${coverV ? `?v=${coverV}` : ''}`} alt="" className="max-h-96 max-w-full self-center rounded" />}
-      <h2 className="m-0 text-xl font-bold text-plum [overflow-wrap:anywhere]">{book.title || 'Titolo sconosciuto'}</h2>
-      <span className="self-start"><Badge read={book.read} /></span>
-      <dl className="m-0">
-        {rows(book).map(([k, v]) => <div key={k}><dt className="mt-2 text-sm text-muted">{k}</dt><dd className="m-0 [overflow-wrap:anywhere]">{v}</dd></div>)}
-      </dl>
-      <Msg text={msg} error={err} />
-      {editing ? (
+  if (editing) {
+    return (
+      <SubPage title="Modifica" fallback="/libreria">
         <form onSubmit={(e) => void save(e)}>
-          <Field label="Titolo"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <Field label="Titolo" error={formErr}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
           <Field label="Autori (separati da virgola)"><Input value={form.authors} onChange={(e) => setForm({ ...form, authors: e.target.value })} /></Field>
           <Field label="Generi (separati da virgola)"><Input value={form.genres} onChange={(e) => setForm({ ...form, genres: e.target.value })} /></Field>
           {EDIT.filter((k) => k !== 'title' && k !== 'notes').map((k) => (
             <Field key={k} label={LABELS[k]}><Input value={form[k]} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></Field>
           ))}
           <Field label="Note"><Textarea rows={3} maxLength={1000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
-          <div className="flex flex-col gap-2">
+          <div className="mt-4 flex flex-col gap-2">
             <Button type="submit" disabled={busy}>Salva</Button>
-            <Button variant="secondary" onClick={() => setEditing(false)}>Annulla</Button>
+            <Button variant="ghost" onClick={() => setEditing(false)}>Annulla</Button>
           </div>
         </form>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Button disabled={busy} onClick={() => void patch({ read: !book.read }, '')}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>
-          {needsRetry(book) && <Button variant="secondary" disabled={busy} onClick={() => void again()}>Cerca di nuovo</Button>}
-          <Button variant="secondary" onClick={startEdit}>Modifica</Button>
-          <label className="flex min-h-11 items-center justify-center rounded-lg bg-blue text-white">
-            Cambia copertina
+      </SubPage>
+    );
+  }
+
+  const tool = 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-lilac-soft px-2 text-sm font-medium text-plum';
+  return (
+    <SubPage title={bookTitle(book)} fallback="/libreria">
+      <div className="flex flex-col gap-3">
+        {book.cover && <img src={`/covers/${book.cover}${coverV ? `?v=${coverV}` : ''}`} alt="" className="mx-auto max-h-96 max-w-full rounded-lg shadow" />}
+        <h2 className="m-0 text-xl font-bold text-plum [overflow-wrap:anywhere]">{book.title || 'Titolo sconosciuto'}</h2>
+        <span className="self-start"><Badge read={book.read} /></span>
+        <Button disabled={busy} onClick={() => void patch({ read: !book.read }, '')} aria-pressed={!!book.read}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>
+        {needsRetry(book) && <Button variant="ghost" onClick={() => void again()}>Cerca di nuovo i dati</Button>}
+        <div className="flex gap-2">
+          <button type="button" className={tool} onClick={startEdit}><Pencil aria-hidden className="size-5" />Modifica</button>
+          <label className={`${tool} cursor-pointer`}>
+            <ImagePlus aria-hidden className="size-5" />Copertina
             <input type="file" accept="image/*" hidden onChange={(e) => { void changeCover(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
-          <Button variant="danger" onClick={() => void del()}>Elimina</Button>
+          <button type="button" className={`${tool} !bg-ko/10 text-ko`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>
         </div>
-      )}
-    </section>
+        <dl className="m-0 rounded-xl bg-paper p-4 shadow-sm">
+          {rows(book).map(([k, v]) => <div key={k} className="py-1.5"><dt className="text-sm text-muted">{k}</dt><dd className="m-0 [overflow-wrap:anywhere]">{v}</dd></div>)}
+        </dl>
+      </div>
+      <Confirm open={askDelete} onOpenChange={setAskDelete} title="Eliminare il libro?" action="Elimina" danger onConfirm={() => void del()}>«{bookTitle(book)}» sparirà dalla libreria.</Confirm>
+    </SubPage>
   );
 }

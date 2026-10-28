@@ -58,18 +58,18 @@ export function Notes() {
 
   return (
     <section>
-      <label htmlFor="notes-text">Libri da leggere o da acquistare</label>
-      <Textarea id="notes-text" rows={14} maxLength={100000} placeholder="Scrivi qui…" disabled={!ready} value={text} onChange={(e) => change(e.target.value)} onBlur={() => void save()} />
+      <label htmlFor="notes-text" className="mb-1 block text-sm font-medium text-plum">Libri da leggere o da acquistare</label>
+      <Textarea id="notes-text" rows={14} className="min-h-[50dvh]" maxLength={100000} placeholder="Scrivi qui…" disabled={!ready} value={text} onChange={(e) => change(e.target.value)} onBlur={() => void save()} />
       <Msg text={msg} error={err} />
       {history.length > 0 && (
         <details>
-          <summary className="min-h-11">Versioni precedenti</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-plum">Versioni precedenti</summary>
           <ul className="list-none p-0">
             {history.map((h, i) => (
-              <li key={i} className="my-2.5">
-                <p>{h.updated ? new Date(h.updated).toLocaleString('it-IT') : ''}</p>
+              <li key={i} className="my-2.5 rounded-xl bg-paper p-3 shadow-sm">
+                <p className="text-sm text-muted">{h.updated ? new Date(h.updated).toLocaleString('it-IT') : ''}</p>
                 <p className="whitespace-pre-wrap">{h.text}</p>
-                <Button onClick={() => { change(h.text); void save(); }}>Usa questa versione</Button>
+                <Button variant="ghost" onClick={() => { change(h.text); void save(); }}>Usa questa versione</Button>
               </li>
             ))}
           </ul>
