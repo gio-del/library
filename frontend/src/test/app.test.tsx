@@ -89,6 +89,24 @@ describe('app', () => {
     expect(screen.queryByTestId('filter-dot')).not.toBeInTheDocument();
   });
 
+  it('a 390 px nessuna riga dei filtri scorre e il genere attivo è una chip che va a capo', async () => {
+    window.innerWidth = 390;
+    server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Sapiens', authors: ['Harari'], genres: ['Saggio'], cover: 'c.jpg' }] });
+    const { container } = open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const stato = screen.getByRole('group', { name: 'Stato' });
+    expect(within(stato).getAllByRole('button')).toHaveLength(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Saggio/ }));
+    const chips = await screen.findByTestId('active-filters');
+    expect(chips.className).toContain('flex-wrap');
+    const scorrevoli = [...container.querySelectorAll('*')].filter((el) => /(^|\s)overflow-x-(auto|scroll)(\s|$)/.test(el.getAttribute('class') || ''));
+    expect(scorrevoli).toHaveLength(0);
+    expect(stato.className).toContain('grid-cols-3');
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Saggio' }));
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+
   it('Gestione chiede conferma e poi rilegge i generi', async () => {
     const calls = server({ 'POST /api/books/classify': { books: [{ ...BOOKS[0], genres: ['Classici'] }], changed: 1 } });
     open('/libreria');
