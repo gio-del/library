@@ -23,4 +23,5 @@ body { margin: 0; font: 16px system-ui, sans-serif; color: var(--color-ink); }
 :focus-visible { outline: 3px solid var(--color-lilac); outline-offset: 1px; }
 
 @keyframes toast-in { from { opacity: 0; transform: translateY(.5rem); } }
+@keyframes fade-in { from { opacity: 0; } }
 @keyframes sheet-in { from { transform: translateY(100%); } }

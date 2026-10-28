@@ -50,6 +50,37 @@ describe('app', () => {
     }
   });
 
+  it('il titolo riporta alla Libreria e azzera ricerca e filtri', async () => {
+    server();
+    open('/libreria');
+    const search = await screen.findByRole('searchbox', { name: 'Cerca per titolo o autore' });
+    await userEvent.type(search, 'narnia');
+    expect(search).toHaveValue('narnia');
+    await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
+    expect(screen.getByRole('searchbox', { name: 'Cerca per titolo o autore' })).toHaveValue('');
+    await userEvent.click(screen.getByRole('link', { name: 'Note' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
+    expect(await screen.findByRole('searchbox', { name: 'Cerca per titolo o autore' })).toBeInTheDocument();
+  });
+
+  it('il logo apre un dialogo, che si chiude con X, Esc e tocco fuori', async () => {
+    server();
+    open('/libreria');
+    const logo = await screen.findByRole('button', { name: 'Mostra il logo ingrandito' });
+    await userEvent.click(logo);
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('img', { name: 'Logo della Libreria' })).toHaveAttribute('src', '/emblem.png');
+    await userEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(logo).toHaveFocus();
+    await userEvent.click(logo);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(logo);
+    await userEvent.click(document.body.querySelector('[data-state="open"].fixed.inset-0') as Element);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('la barra in basso ha tre voci e segna quella corrente', async () => {
     server();
     open('/libreria');

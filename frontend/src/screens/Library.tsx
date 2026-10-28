@@ -1,6 +1,6 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { bookGenres, bookTitle, genreCounts, matchRead, type ReadFilter } from '../lib/books';
 import { cn } from '../lib/cn';
 import type { Book } from '../lib/types';
@@ -19,6 +19,10 @@ export function Library() {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
+  const { key } = useLocation();
+
+  // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
+  useEffect(() => { setState('all'); setGenre(''); setQuery(''); }, [key]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
 
