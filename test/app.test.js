@@ -40,7 +40,7 @@ function load(routes) {
     return { status: r[0], ok: r[0] < 400, json: async () => r[1] };
   };
   const ctx = { document: { getElementById: (id) => els[id], createElement: () => el('x') }, localStorage: { getItem: () => null, setItem() {} },
-    navigator: {}, window: {}, fetch, setTimeout, confirm: () => true, console };
+    navigator: {}, window: {}, fetch, setTimeout, clearTimeout, confirm: () => true, console };
   vm.runInNewContext(src, ctx);
   return { els, calls };
 }
@@ -128,6 +128,24 @@ test('elenco → scheda: campi vuoti omessi, modifica, salvataggio, ritorno', as
   els['d-back'].click();
   assert.equal(els.lib.hidden, false);
   assert.equal(els.detail.hidden, true);
+});
+
+test('note: si caricano dal server e il testo digitato si salva da solo', async () => {
+  const { els, calls } = load({
+    'GET /api/auth/status': [200, { authenticated: true }],
+    'GET /api/notes': [200, { text: 'Dune', rev: 3, history: [] }],
+    'PUT /api/notes': [200, { text: 'Dune\nEmma', rev: 4, history: [], overwritten: false }],
+  });
+  await tick();
+  els['tab-notes'].click();
+  await tick();
+  assert.strictEqual(els['notes-text'].value, 'Dune');
+  assert.strictEqual(els.notes.hidden, false);
+  els['notes-text'].value = 'Dune\nEmma';
+  for (const f of els['notes-text'].listeners.blur) f({});
+  await tick();
+  assert.ok(calls.includes('PUT /api/notes'));
+  assert.strictEqual(els['notes-msg'].textContent, 'Salvato');
 });
 
 test('filtro per genere: conteggi e combinazione con letto / da leggere', async () => {

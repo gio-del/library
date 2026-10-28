@@ -15,6 +15,7 @@
   <nav id="nav" hidden>
     <button id="tab-scan" type="button">Scansiona</button>
     <button id="tab-lib" type="button">Libreria</button>
+    <button id="tab-notes" type="button">Note</button>
     <button id="logout" type="button">Esci</button>
   </nav>
 </header>
@@ -101,6 +102,15 @@
       <label id="d-cover-pick" class="btn">Cambia copertina <input id="d-cover-file" type="file" accept="image/*" hidden></label>
       <button id="d-delete" type="button" class="danger">Elimina</button>
     </div>
+  </section>
+  <section id="notes" hidden>
+    <label for="notes-text">Libri da leggere o da acquistare</label>
+    <textarea id="notes-text" rows="14" maxlength="100000" placeholder="Scrivi qui…" disabled></textarea>
+    <p id="notes-msg" class="msg" role="status"></p>
+    <details id="notes-hist" hidden>
+      <summary>Versioni precedenti</summary>
+      <ul id="notes-hist-list"></ul>
+    </details>
   </section>
   <section id="lib" hidden>
     <p id="lib-msg" class="msg" role="status"></p>

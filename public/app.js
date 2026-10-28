@@ -11,6 +11,10 @@ let libBooks = [];
 let filter = 'all';
 let genre = '';
 let detailBook = null;
+let notesRev = 0;
+let notesSaved = '';
+let notesTimer = null;
+let notesBusy = false;
 
 const hasIsbn = (b) => /^\d{13}$/.test(b.isbn);
 const needsRetry = (b) => hasIsbn(b) && (b.lookup === 'failed' || !b.cover);
@@ -26,7 +30,7 @@ async function api(method, url, body) {
 function say(el, text, err) { el.textContent = text; el.classList.toggle('err', !!err); }
 
 function show(name) {
-  for (const s of ['login', 'scan', 'lib', 'detail', 'manual']) $(s).hidden = s !== name;
+  for (const s of ['login', 'scan', 'lib', 'detail', 'manual', 'notes']) $(s).hidden = s !== name;
   $('nav').hidden = name === 'login';
   if (name !== 'scan') stopCamera();
 }
@@ -421,6 +425,61 @@ $('card-again').addEventListener('click', async () => {
   } catch (e) { say($('scan-msg'), e.message, true); }
   $('card-again').disabled = false;
 });
+function renderHistory(history) {
+  $('notes-hist').hidden = !history.length;
+  $('notes-hist-list').replaceChildren(...history.map((h) => {
+    const li = document.createElement('li');
+    const when = document.createElement('p');
+    when.textContent = h.updated ? new Date(h.updated).toLocaleString('it-IT') : '';
+    const pre = document.createElement('p');
+    pre.textContent = h.text;
+    pre.style.whiteSpace = 'pre-wrap';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = 'Usa questa versione';
+    b.addEventListener('click', () => { $('notes-text').value = h.text; saveNotes(); });
+    li.append(when, pre, b);
+    return li;
+  }));
+}
+
+// Salvataggio automatico: una richiesta alla volta, sempre con l'ultimo testo.
+async function saveNotes() {
+  clearTimeout(notesTimer);
+  if (notesBusy) { notesTimer = setTimeout(saveNotes, 300); return; }
+  const text = $('notes-text').value;
+  if (text === notesSaved) return;
+  notesBusy = true;
+  say($('notes-msg'), 'Salvataggio…');
+  try {
+    const r = await api('PUT', '/api/notes', { text, rev: notesRev });
+    notesRev = r.rev;
+    notesSaved = text;
+    renderHistory(r.history);
+    say($('notes-msg'), r.overwritten ? 'Salvato. Un altro dispositivo aveva modificato le note: la sua versione è in «Versioni precedenti».' : 'Salvato', r.overwritten);
+    if ($('notes-text').value !== text) notesTimer = setTimeout(saveNotes, 300);
+  } catch (e) { say($('notes-msg'), `Non salvato: ${e.message}`, true); notesTimer = setTimeout(saveNotes, 5000); }
+  notesBusy = false;
+}
+
+async function loadNotes() {
+  show('notes');
+  say($('notes-msg'), '');
+  if ($('notes-text').value !== notesSaved) return; // modifiche non ancora salvate: non si sovrascrivono
+  try {
+    const r = await api('GET', '/api/notes');
+    notesRev = r.rev;
+    notesSaved = r.text;
+    $('notes-text').value = r.text;
+    $('notes-text').disabled = false;
+    renderHistory(r.history);
+  } catch (e) { if (e.status !== 401) say($('notes-msg'), e.message, true); }
+}
+
+$('tab-notes').addEventListener('click', loadNotes);
+$('notes-text').addEventListener('input', () => { clearTimeout(notesTimer); notesTimer = setTimeout(saveNotes, 800); });
+$('notes-text').addEventListener('blur', saveNotes);
+if (document.addEventListener) document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNotes(); });
 const MANUAL = ['title', 'publisher', 'year', 'edition', 'language', 'pages', 'notes'];
 
 function openManual() {
