@@ -231,6 +231,38 @@ test('scheda: modifica campi con PATCH e cambio copertina con PUT', async (t) =>
   assert.strictEqual(nobody.status, 401);
 });
 
+test('generi: classificati dalle fonti, correzione a mano non sovrascritta dalla riclassificazione', async (t) => {
+  const f = (url) => (String(url).includes('/isbn/9780306406157.json')
+    ? json({ title: 'T', authors: [], subjects: ['Horror tales', 'Ghost stories', 'Cooking'] })
+    : fakeFetch(url));
+  const { call, login } = await start(t, f);
+  const sid = await login();
+  const added = await (await call('POST', '/api/books', { isbn: '9780306406157' }, sid)).json();
+  assert.deepStrictEqual(added.book.genres, ['Horror']);
+  const bad = await call('PATCH', '/api/books/9780306406157', { genres: 'x' }, sid);
+  assert.strictEqual(bad.status, 400);
+  const p = await (await call('PATCH', '/api/books/9780306406157', { genres: ['Romance'] }, sid)).json();
+  assert.deepStrictEqual(p.book.genres, ['Romance']);
+  const r = await (await call('POST', '/api/books/classify', {}, sid)).json();
+  assert.strictEqual(r.changed, 0);
+  assert.deepStrictEqual(r.books[0].genres, ['Romance']);
+});
+
+test('generi: libro già presente senza generi viene classificato, i non riconosciuti vanno in «Altro»', async (t) => {
+  const { classify } = require('../lib/genres');
+  assert.deepStrictEqual(classify([]), ['Senza genere']);
+  assert.deepStrictEqual(classify(['Cooking']), ['Altro']);
+  assert.deepStrictEqual(classify(['Fantasy fiction', 'Romance']).sort(), ['Fantasy', 'Romance']);
+  const f = (url) => (String(url).includes('/isbn/9780306406157.json')
+    ? json({ title: 'T', authors: [], subjects: ['Science fiction'] }) : fakeFetch(url));
+  const { call, login, dataDir } = await start(t, f);
+  fs.writeFileSync(path.join(dataDir, 'books.json'), JSON.stringify([{ isbn: '9780306406157', title: 'T', authors: [], cover: null }]));
+  const sid = await login();
+  const r = await (await call('POST', '/api/books/classify', {}, sid)).json();
+  assert.strictEqual(r.changed, 1);
+  assert.deepStrictEqual(r.books[0].genres, ['Fantascienza']);
+});
+
 test('libro a mano senza ISBN: aggiunta, doppione, ricerca, scheda, copertina, eliminazione', async (t) => {
   const { call, login } = await start(t);
   const c = await login();

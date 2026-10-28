@@ -9,6 +9,7 @@ let current = null;
 let checkSeq = 0;
 let libBooks = [];
 let filter = 'all';
+let genre = '';
 let detailBook = null;
 
 const hasIsbn = (b) => /^\d{13}$/.test(b.isbn);
@@ -189,6 +190,27 @@ function stopCamera() {
   $('video').hidden = true;
 }
 
+const bookGenres = (b) => (Array.isArray(b.genres) && b.genres.length ? b.genres : ['Senza genere']);
+const matchRead = (b) => filter === 'all' || (filter === 'read') === !!b.read;
+
+// Pulsanti dei generi con il numero di libri, calcolati sul filtro letto / da leggere attivo.
+function renderGenres() {
+  const box = $('genres');
+  const counts = new Map();
+  for (const b of libBooks.filter(matchRead)) for (const g of bookGenres(b)) counts.set(g, (counts.get(g) || 0) + 1);
+  if (genre && !counts.has(genre)) counts.set(genre, 0);
+  box.replaceChildren();
+  const add = (label, value) => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = label;
+    btn.classList.toggle('on', genre === value);
+    btn.addEventListener('click', () => { genre = value; renderLibrary(); });
+    box.append(btn);
+  };
+  add(`Tutti i generi (${libBooks.filter(matchRead).length})`, '');
+  for (const [g, c] of [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'))) add(`${g} (${c})`, g);
+  box.hidden = !libBooks.length;
+}
+
 function renderLibrary() {
   const n = (f) => libBooks.filter(f).length;
   const nRead = n((b) => b.read);
@@ -196,7 +218,8 @@ function renderLibrary() {
   $('f-toread').textContent = `Da leggere (${libBooks.length - nRead})`;
   $('f-read').textContent = `Letti (${nRead})`;
   for (const [id, f] of [['f-all', 'all'], ['f-toread', 'toread'], ['f-read', 'read']]) $(id).classList.toggle('on', filter === f);
-  const shown = libBooks.filter((b) => filter === 'all' || (filter === 'read') === !!b.read);
+  renderGenres();
+  const shown = libBooks.filter((b) => matchRead(b) && (!genre || bookGenres(b).includes(genre)));
   say($('lib-msg'), !libBooks.length ? 'La libreria è vuota' : shown.length ? `${shown.length} libri` : 'Nessun libro in questo elenco');
   const grid = $('grid');
   grid.replaceChildren();
@@ -251,7 +274,7 @@ function detailRows(b) {
   const added = b.added && !Number.isNaN(Date.parse(b.added)) ? new Date(b.added).toLocaleDateString('it-IT') : '';
   return [
     ['Autori', (b.authors || []).join(', ')], ['Edizione', b.edition], ['Editore', b.publisher], ['Anno', b.year],
-    ['Collana', b.series], ['Pagine', b.pages], ['Lingua', b.language],
+    ['Generi', bookGenres(b).join(', ')], ['Collana', b.series], ['Pagine', b.pages], ['Lingua', b.language],
     ['Note', b.notes], ['ISBN-13', hasIsbn(b) ? b.isbn : ''], ['ISBN-10', isbn10Of(b.isbn)],
     ['Fonte dei dati', SOURCES[b.source] || b.source], ['Aggiunto il', added],
   ].filter(([, v]) => v);
@@ -287,6 +310,7 @@ const EDIT = ['title', 'edition', 'publisher', 'year', 'series', 'pages', 'langu
 function editDetail() {
   for (const k of EDIT) $(`e-${k}`).value = detailBook[k] || '';
   $('e-authors').value = (detailBook.authors || []).join(', ');
+  $('e-genres').value = (detailBook.genres || []).join(', ');
   $('d-form').hidden = false;
   $('d-actions').hidden = true;
 }
@@ -305,6 +329,8 @@ async function toJpeg(file) {
 async function saveDetail(ev) {
   ev.preventDefault();
   const body = { authors: $('e-authors').value.split(',').map((x) => x.trim()).filter(Boolean) };
+  const genres = $('e-genres').value.split(',').map((x) => x.trim()).filter(Boolean);
+  if (genres.join('|') !== (detailBook.genres || []).join('|')) body.genres = genres;
   for (const k of EDIT) body[k] = $(`e-${k}`).value;
   try {
     const r = await api('PATCH', `/api/books/${detailBook.isbn}`, body);
@@ -372,6 +398,17 @@ $('retry-all').addEventListener('click', async () => {
     say($('lib-msg'), `Aggiornati ${r.found} libri su ${r.retried}`);
   } catch (e) { say($('lib-msg'), e.message, true); }
   $('retry-all').disabled = false;
+});
+$('reclassify').addEventListener('click', async () => {
+  $('reclassify').disabled = true;
+  say($('lib-msg'), 'Rileggo i generi…');
+  try {
+    const r = await api('POST', '/api/books/classify');
+    libBooks = r.books;
+    renderLibrary();
+    say($('lib-msg'), `Generi aggiornati su ${r.changed} libri`);
+  } catch (e) { say($('lib-msg'), e.message, true); }
+  $('reclassify').disabled = false;
 });
 $('card-again').addEventListener('click', async () => {
   if (!cardBook) return;
