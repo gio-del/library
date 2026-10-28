@@ -35,6 +35,21 @@ describe('app', () => {
     expect(await screen.findByRole('button', { name: 'Accedi' })).toBeInTheDocument();
   });
 
+  it('il fregio di stelle e lune c\u2019è in ogni schermata ed è decorativo', async () => {
+    server({ 'GET /api/auth/status': { authenticated: false } });
+    const { unmount } = open('/libreria');
+    await screen.findByRole('button', { name: 'Accedi' });
+    expect(screen.getAllByTestId('ornament')).toHaveLength(1);
+    unmount();
+    server();
+    for (const [path, n] of [['/libreria', 2], ['/scansiona', 2], ['/note', 2], ['/libro/9780306406157', 1]] as const) {
+      const r = open(path);
+      await waitFor(() => expect(screen.getAllByTestId('ornament')).toHaveLength(n));
+      for (const o of screen.getAllByTestId('ornament')) expect(o).toHaveAttribute('aria-hidden', 'true');
+      r.unmount();
+    }
+  });
+
   it('la barra in basso ha tre voci e segna quella corrente', async () => {
     server();
     open('/libreria');

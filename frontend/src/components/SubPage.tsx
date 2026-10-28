@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Ornament } from './Ornament';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 // Schermata a sé, senza barra in basso: freccia indietro (alla pagina precedente dell'app, se c'è) e titolo.
@@ -14,6 +15,7 @@ export function SubPage({ title, fallback, children }: { title: string; fallback
         </button>
         <h1 className="truncate text-lg font-semibold">{title}</h1>
       </header>
+      <Ornament />
       <main className="mx-auto max-w-2xl px-4 py-4">{children}</main>
     </div>
   );

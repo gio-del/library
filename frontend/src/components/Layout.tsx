@@ -9,6 +9,7 @@ import type { Book } from '../lib/types';
 import { useAuth } from '../state/auth';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
+import { Ornament } from './Ornament';
 import { Confirm } from './Confirm';
 import { useToast } from './Toast';
 
@@ -17,6 +18,7 @@ const TABS: [string, string, LucideIcon][] = [['/libreria', 'Libreria', Library]
 export function BottomNav() {
   return (
     <nav aria-label="Sezioni" className="fixed inset-x-0 bottom-0 z-30 border-t border-lilac/60 bg-paper pb-[env(safe-area-inset-bottom)]">
+      <Ornament variant="light" />
       <ul className="m-0 mx-auto flex max-w-2xl list-none p-0">
         {TABS.map(([to, label, Icon]) => (
           <li key={to} className="flex-1">
@@ -91,8 +93,9 @@ export function TopBar() {
 
 export function Layout() {
   return (
-    <div className="min-h-dvh pb-[calc(5rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-dvh pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
       <TopBar />
+      <Ornament />
       <main className="mx-auto max-w-2xl px-4 py-4"><Outlet /></main>
       <BottomNav />
     </div>

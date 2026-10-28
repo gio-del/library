@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../state/auth';
+import { Ornament } from '../components/Ornament';
 import { Button, Field, Input } from '../components/ui';
 
 export function Login() {
@@ -19,6 +20,7 @@ export function Login() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-8">
+      <Ornament className="mb-4 rounded" />
       <img src="/logo" alt="Logo della libreria" className="mx-auto mb-4 block h-auto w-[min(16rem,70%)]" />
       <form onSubmit={(e) => void submit(e)} className="rounded-2xl bg-paper p-5 shadow-sm">
         <Field label="Utente"><Input value={user} onChange={(e) => setUser(e.target.value)} autoComplete="username" /></Field>
