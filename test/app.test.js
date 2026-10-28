@@ -156,9 +156,9 @@ test('filtro per genere: conteggi e combinazione con letto / da leggere', async 
   els['tab-lib'].click();
   await tick(); await tick();
   const labels = () => els.genres.children.map((c) => c.textContent);
-  assert.deepStrictEqual(labels(), ['Tutti i generi (5)', 'Horror (3)', 'Giallo (1)', 'Romance (1)', 'Altro (1)']);
+  assert.deepStrictEqual(labels(), ['Tutti i generi (5)', 'Horror (3)', 'Altro (1)', 'Giallo (1)', 'Romance (1)']);
   els['f-toread'].click();
-  assert.deepStrictEqual(labels(), ['Tutti i generi (4)', 'Horror (2)', 'Romance (1)', 'Altro (1)']);
+  assert.deepStrictEqual(labels(), ['Tutti i generi (4)', 'Horror (2)', 'Altro (1)', 'Romance (1)']);
   els.genres.children[1].click();
   assert.equal(els.grid.children.length, 2);
   els['f-read'].click();
