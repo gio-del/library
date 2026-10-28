@@ -75,7 +75,16 @@ test('libro assente: resta non salvato finché non si preme «Salva»; doppio to
   els['verdict-add'].click();
   await tick(); await tick();
   assert.equal(calls.filter((c) => c.startsWith('POST')).length, 1);
-  assert.match(els['verdict-text'].textContent, /già/);
+  assert.match(els['verdict-text'].textContent, /Aggiunto alla libreria/);
+});
+
+test('fotocamera: area ridotta, verdetto subito sotto, «Aggiungi alla libreria» se manca', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+  assert.match(css, /video {[^}]*max-height: 32vh/);
+  assert.match(css, /video {[^}]*object-fit: cover/);
+  const at = (id) => html.indexOf('id="' + id + '"');
+  assert.ok(at('camera') < at('scan-msg') && at('scan-msg') < at('verdict') && at('verdict') < at('card') && at('card') < at('manual-form'), 'esito subito sotto la fotocamera');
+  assert.match(html, /id="verdict-add"[^>]*>Aggiungi alla libreria</);
 });
 
 test('niente più tasti Controlla/Aggiungi separati né «Cerca e salva»', () => {
