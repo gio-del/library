@@ -147,3 +147,24 @@ test('filtro per genere: conteggi e combinazione con letto / da leggere', async 
   assert.equal(els.grid.children.length, 1);
   assert.ok(labels().includes('Horror (1)'));
 });
+
+test('titolo non trovato → «aggiungilo a mano» precompilato → salva senza ISBN', async () => {
+  const man = { isbn: 'm0123456789ab', title: 'Vecchio libro', authors: [], manual: true, cover: null };
+  const { els, calls } = load({
+    'GET /api/books?q=Vecchio%20libro': [200, []],
+    'POST /api/books': [201, { status: 'saved', book: man }],
+  });
+  els.isbn.value = 'Vecchio libro';
+  for (const f of els['manual-form'].listeners.submit) f({ preventDefault() {} });
+  await tick(); await tick();
+  assert.match(els['verdict-text'].textContent, /Non/);
+  assert.equal(els['verdict-add'].hidden, true);
+  els['add-manual'].click();
+  assert.equal(els.manual.hidden, false);
+  assert.equal(els['m-title'].value, 'Vecchio libro');
+  for (const f of els['m-form'].listeners.submit) f({ preventDefault() {}, target: els['m-form'] });
+  await tick(); await tick(); await tick();
+  assert.ok(calls.includes('POST /api/books'));
+  assert.match(els['verdict-text'].textContent, /già/);
+  assert.equal(els['verdict-title'].textContent, 'Vecchio libro');
+});
