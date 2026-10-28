@@ -148,6 +148,24 @@ test('note: si caricano dal server e il testo digitato si salva da solo', async 
   assert.strictEqual(els['notes-msg'].textContent, 'Salvato');
 });
 
+test('filtro per genere: conteggi e combinazione con letto / da leggere', async () => {
+  const mk = (n, genres, read) => ({ isbn: `97803064061${n}`, title: `L${n}`, authors: [], cover: 'x', genres, read });
+  const books = [mk(10, ['Horror'], false), mk(11, ['Horror'], false), mk(12, ['Horror', 'Giallo'], true), mk(13, ['Romance'], false), mk(14, undefined, false)];
+  const { els } = load({ 'GET /api/auth/status': [200, { authenticated: true }], 'GET /api/books': [200, books] });
+  await tick(); await tick();
+  els['tab-lib'].click();
+  await tick(); await tick();
+  const labels = () => els.genres.children.map((c) => c.textContent);
+  assert.deepStrictEqual(labels(), ['Tutti i generi (5)', 'Horror (3)', 'Giallo (1)', 'Romance (1)', 'Senza genere (1)']);
+  els['f-toread'].click();
+  assert.deepStrictEqual(labels(), ['Tutti i generi (4)', 'Horror (2)', 'Romance (1)', 'Senza genere (1)']);
+  els.genres.children[1].click();
+  assert.equal(els.grid.children.length, 2);
+  els['f-read'].click();
+  assert.equal(els.grid.children.length, 1);
+  assert.ok(labels().includes('Horror (1)'));
+});
+
 test('titolo non trovato → «aggiungilo a mano» precompilato → salva senza ISBN', async () => {
   const man = { isbn: 'm0123456789ab', title: 'Vecchio libro', authors: [], manual: true, cover: null };
   const { els, calls } = load({

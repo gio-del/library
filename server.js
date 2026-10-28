@@ -9,6 +9,7 @@ const { createStore } = require('./lib/store');
 const { createNotes, MAX_TEXT } = require('./lib/notes');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
+const { classify, MAX_GENRES } = require('./lib/genres');
 
 const MAX_BODY = 4096;
 const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
@@ -108,12 +109,14 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     try { found = await lookup(book.isbn, fetchFn); } catch { /* trattato come non trovato */ }
     if (!found) { book.lookup = 'failed'; return; }
     Object.assign(book, { title: found.title, authors: found.authors, publisher: found.publisher, year: found.year, source: found.source });
+    book.subjects = found.subjects || [];
+    if (!book.genresManual) book.genres = classify(book.subjects);
     if (found.cover) await saveCover(book, found.cover);
   }
 
   async function addBook(isbn) {
     if (await store.get(isbn)) return { status: 200, body: { status: 'exists', book: await store.get(isbn) } };
-    const book = { isbn, title: '', authors: [], publisher: '', year: '', cover: null, read: false, added: new Date(now()).toISOString() };
+    const book = { isbn, title: '', authors: [], publisher: '', year: '', cover: null, genres: classify([]), read: false, added: new Date(now()).toISOString() };
     await fillBook(book);
     if (!(await store.add(book))) return { status: 200, body: { status: 'exists', book: await store.get(isbn) } };
     return { status: 201, body: { status: 'saved', book } };
@@ -130,6 +133,25 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       if (cover) await saveCover(book, cover);
     } else await fillBook(book);
     return (await store.replace(book)) || null;
+  }
+
+  // Rilancia la classificazione sui libri non corretti a mano; cerca i soggetti solo per chi non li ha ancora.
+  async function classifyAll() {
+    let changed = 0;
+    for (const b of await store.list()) {
+      if (b.genresManual) continue;
+      let subjects = b.subjects;
+      if (!Array.isArray(subjects) && b.lookup !== 'failed' && /^\d{13}$/.test(b.isbn)) {
+        try { subjects = ((await lookup(b.isbn, fetchFn)) || {}).subjects; } catch { /* resta com'è */ }
+      }
+      const cur = await store.get(b.isbn);
+      if (!cur || cur.genresManual) continue;
+      const genres = classify(subjects);
+      const next = { ...cur, genres };
+      if (Array.isArray(subjects)) next.subjects = subjects;
+      if (JSON.stringify(next) !== JSON.stringify(cur)) { await store.replace(next); changed++; }
+    }
+    return changed;
   }
 
   // Valida e ripulisce i campi di testo modificabili presenti in `b`.
@@ -168,7 +190,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const dup = (await store.list()).find((x) => sameText(x.title, fields.title) && sameText((x.authors || []).join(', '), authors.join(', ')));
       if (dup) return { status: 409, body: { status: 'duplicate', error: 'Esiste già un libro con lo stesso titolo e autore', book: dup } };
     }
-    const book = { isbn: isbn || `m${crypto.randomBytes(6).toString('hex')}`, title: '', authors: [], publisher: '', year: '', cover: null, read: false, manual: true, ...fields, added: new Date(now()).toISOString() };
+    const book = { isbn: isbn || `m${crypto.randomBytes(6).toString('hex')}`, title: '', authors: [], publisher: '', year: '', cover: null, read: false, manual: true, genres: classify([]), ...fields, added: new Date(now()).toISOString() };
     if (!(await store.add(book))) return { status: 200, body: { status: 'exists', book: await store.get(book.isbn) } };
     return { status: 201, body: { status: 'saved', book } };
   }
@@ -222,6 +244,10 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       for (const b of await store.list()) if (/^\d{13}$/.test(b.isbn) && (b.lookup === 'failed' || !b.cover)) { const r = await retryBook(b.isbn); if (r) out.push(r); }
       return send(res, 200, { retried: out.length, found: out.filter((b) => b.lookup !== 'failed').length, books: out });
     }
+    if (req.method === 'POST' && p === '/api/books/classify') {
+      const changed = await classifyAll();
+      return send(res, 200, { changed, books: await store.list() });
+    }
     const lk = /^\/api\/books\/(\d{13})\/lookup$/.exec(p); // solo con ISBN
     if (req.method === 'POST' && lk) {
       const book = await retryBook(lk[1]);
@@ -250,6 +276,11 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       if ('read' in b) {
         if (typeof b.read !== 'boolean') return send(res, 400, { error: 'Stato non valido' });
         patch.read = b.read;
+      }
+      if ('genres' in b) {
+        if (!Array.isArray(b.genres) || b.genres.length > MAX_GENRES || b.genres.some((g) => typeof g !== 'string')) return send(res, 400, { error: 'Generi non validi' });
+        patch.genres = [...new Set(b.genres.map((g) => g.trim().slice(0, 40)).filter(Boolean))];
+        patch.genresManual = true;
       }
       const f = cleanFields(b);
       if (f.error) return send(res, 400, { error: f.error });
