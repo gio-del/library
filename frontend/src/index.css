@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+/* Palette dal logo ex libris: prugna della scritta, blu del drago, lilla dei gigli, oro della luna, crema delle pagine. */
+@theme {
+  --color-plum: #492151;
+  --color-plum-2: #6b3a78;
+  --color-blue: #3a65ac;
+  --color-lilac: #b8a2e0;
+  --color-lilac-soft: #efe8f8;
+  --color-gold: #e4c08e;
+  --color-cream: #fbf3e5;
+  --color-paper: #fffdf8;
+  --color-ink: #22172a;
+  --color-muted: #5e5266;
+  --color-ok: #2e7d32;
+  --color-ko: #a53b3b;
+  --font-script: 'Dancing Script', 'Segoe Script', 'Brush Script MT', cursive;
+}
+
+html { background: var(--color-cream); }
+body { margin: 0; font: 16px system-ui, sans-serif; color: var(--color-ink); }
+:focus-visible { outline: 3px solid var(--color-lilac); outline-offset: 1px; }

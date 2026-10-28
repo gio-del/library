@@ -367,3 +367,15 @@ test('generi: libri salvati «Senza genere» si rileggono da SBN (Dewey) con «R
   assert.deepStrictEqual(by['9780306406157'].genres, ['Romance']);
   for (const b of r.books) assert.ok(!b.genres.includes('Senza genere'));
 });
+
+test('indirizzi dell’app: la pagina è la stessa, i file inesistenti restano 404', async (t) => {
+  const { call } = await start(t);
+  for (const p of ['/libreria', '/libro/9780306406157', '/scansiona/manuale']) {
+    const res = await call('GET', p);
+    assert.strictEqual(res.status, 200, p);
+    assert.match(res.headers.get('content-type'), /^text\/html/);
+  }
+  assert.strictEqual((await call('GET', '/nonesiste.js')).status, 404);
+  assert.strictEqual((await call('GET', '/assets/../server.js')).status, 404);
+  assert.strictEqual((await call('GET', '/assets/nonesiste.js')).status, 404);
+});

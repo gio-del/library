@@ -1,6 +1,6 @@
 # library
 
-Scansiona il codice a barre (ISBN) dei tuoi libri col telefono e tieni una libreria virtuale. Node 22, nessuna dipendenza npm, nessuna build. I dati dei libri vengono da [Open Library](https://openlibrary.org); le copertine sono scaricate dal server, così il telefono non contatta terzi.
+Scansiona il codice a barre (ISBN) dei tuoi libri col telefono e tieni una libreria virtuale. Node 22, backend senza dipendenze npm; frontend React + Vite in `frontend/` (`./ci` lo costruisce in `public/`). I dati dei libri vengono da [Open Library](https://openlibrary.org); le copertine sono scaricate dal server, così il telefono non contatta terzi.
 
 ## Avvio
 

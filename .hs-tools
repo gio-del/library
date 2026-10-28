@@ -1,2 +1,2 @@
 # NOME VERSIONE PIATTAFORMA SHA256 URL
-# Nessuno strumento da fissare: serve solo Node >= 22, senza dipendenze npm.
+# Nessuno strumento da fissare: serve solo Node >= 22 (backend senza dipendenze npm; il frontend ne ha, bloccate da frontend/package-lock.json).
