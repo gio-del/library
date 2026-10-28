@@ -4,6 +4,7 @@ import { api, putCover, toJpeg } from '../lib/api';
 import { looksLikeIsbn } from '../lib/isbn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
+import { CoverPicker } from '../components/CoverPicker';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
 import { Button, Field, Input, Textarea } from '../components/ui';
@@ -16,7 +17,8 @@ export function ManualForm() {
   const { upsert } = useBooks();
   const t = (state?.query || '').trim();
   const [f, setF] = useState<Record<string, string>>({ title: looksLikeIsbn(t) ? '' : t, isbn: looksLikeIsbn(t) ? t : '', authors: '', publisher: '', year: '', edition: '', language: '', pages: '', notes: '' });
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<Blob | null>(null);
+  const [fileName, setFileName] = useState('');
   const [err, setErr] = useState('');
   const [titleErr, setTitleErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,10 +60,8 @@ export function ManualForm() {
         {FIELDS.map(([k, label, num]) => <Field key={k} label={label}><Input value={f[k]} onChange={set(k)} inputMode={num ? 'numeric' : undefined} /></Field>)}
         <Field label="ISBN (se c’è)"><Input value={f.isbn} onChange={set('isbn')} inputMode="numeric" autoComplete="off" /></Field>
         <Field label="Note"><Textarea rows={3} maxLength={1000} value={f.notes} onChange={set('notes')} /></Field>
-        <label className="my-3 flex min-h-12 cursor-pointer items-center justify-center rounded-xl bg-lilac-soft px-3 text-center font-medium text-plum">
-          {file ? file.name : 'Aggiungi la copertina (foto o immagine)'}
-          <input type="file" accept="image/*" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
+        {file && <p className="mb-0 mt-3 text-center text-sm text-muted">Copertina: {fileName}</p>}
+        <CoverPicker className="my-3" onPick={(f, n) => { setFile(f); setFileName(n || ''); }} />
         {err && <p role="alert" className="text-ko">{err}</p>}
         <div className="mt-4 flex flex-col gap-2">
           <Button type="submit" disabled={busy}>Salva</Button>

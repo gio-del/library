@@ -1,4 +1,4 @@
-import { ImagePlus, Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
@@ -7,6 +7,7 @@ import { isbn10Of } from '../lib/isbn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
+import { CoverPicker } from '../components/CoverPicker';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
 import { useToast } from '../components/Toast';
@@ -78,8 +79,7 @@ export function BookDetail() {
     if (await patch(body, 'Salvato')) setEditing(false);
   }
 
-  async function changeCover(file?: File) {
-    if (!file) return;
+  async function changeCover(file: Blob) {
     await lock('cover', async () => {
       toast('Carico la copertina…');
       try {
@@ -149,12 +149,9 @@ export function BookDetail() {
         <span className="self-start"><Badge read={book.read} /></span>
         <Button disabled={busy} onClick={() => void patch({ read: !book.read }, '')} aria-pressed={!!book.read}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>
         {needsRetry(book) && <Button variant="ghost" onClick={() => void again()}>Cerca di nuovo i dati</Button>}
+        <CoverPicker onPick={(f) => void changeCover(f)} />
         <div className="flex gap-2">
           <button type="button" className={tool} onClick={startEdit}><Pencil aria-hidden className="size-5" />Modifica</button>
-          <label className={`${tool} cursor-pointer`}>
-            <ImagePlus aria-hidden className="size-5" />Copertina
-            <input type="file" accept="image/*" hidden onChange={(e) => { void changeCover(e.target.files?.[0]); e.target.value = ''; }} />
-          </label>
           <button type="button" className={`${tool} !bg-ko/10 text-ko`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>
         </div>
         <dl className="m-0 rounded-xl bg-paper p-4 shadow-sm">
