@@ -250,3 +250,44 @@ test('note: salvataggio, ricarica e versione sovrascritta recuperabile', async (
   assert.strictEqual(r.text, 'Altro');
   assert.strictEqual((await call('PUT', '/api/notes', { text: 5, rev: 0 }, c)).status, 400);
 });
+
+test('libro a mano senza ISBN: aggiunta, doppione, ricerca, scheda, copertina, eliminazione', async (t) => {
+  const { call, login } = await start(t);
+  const c = await login();
+  assert.strictEqual((await call('POST', '/api/books', { manual: true, title: '  ' }, c)).status, 400);
+  const r = await call('POST', '/api/books', { manual: true, title: 'Il Gattopardo', authors: ['Tomasi'], notes: 'regalo', year: '1958' }, c);
+  assert.strictEqual(r.status, 201);
+  const { book } = await r.json();
+  assert.match(book.isbn, /^m[0-9a-f]{12}$/);
+  assert.strictEqual(book.manual, true);
+  assert.strictEqual(book.notes, 'regalo');
+  // doppione: stesso titolo e autore, anche con maiuscole diverse
+  const d = await call('POST', '/api/books', { manual: true, title: 'il gattopardo', authors: ['tomasi'] }, c);
+  assert.strictEqual(d.status, 409);
+  assert.strictEqual((await d.json()).book.isbn, book.isbn);
+  assert.strictEqual((await call('POST', '/api/books', { manual: true, title: 'il gattopardo', authors: ['tomasi'], force: true }, c)).status, 201);
+  // ricerca testuale
+  const found = await (await call('GET', '/api/books?q=gattopardo%20TOMASI', null, c)).json();
+  assert.strictEqual(found.length, 2);
+  assert.strictEqual((await (await call('GET', '/api/books?q=manzoni', null, c)).json()).length, 0);
+  // scheda, letto, modifica, copertina, eliminazione
+  assert.strictEqual((await call('GET', `/api/books/${book.isbn}`, null, c)).status, 200);
+  const p = await (await call('PATCH', `/api/books/${book.isbn}`, { read: true, notes: 'x' }, c)).json();
+  assert.strictEqual(p.book.read, true);
+  assert.strictEqual(p.book.notes, 'x');
+  const up = await fetch((await call('GET', '/api/auth/status', null, c)).url.replace('/api/auth/status', `/api/books/${book.isbn}/cover`), { method: 'PUT', headers: { cookie: c }, body: JPEG });
+  assert.strictEqual(up.status, 200);
+  assert.strictEqual((await call('DELETE', `/api/books/${book.isbn}`, null, c)).status, 200);
+  assert.strictEqual((await call('GET', `/api/books/${book.isbn}`, null, c)).status, 404);
+});
+
+test('libro a mano con ISBN: usa l’ISBN e non lo ripete', async (t) => {
+  const { call, login } = await start(t);
+  const c = await login();
+  const r = await call('POST', '/api/books', { manual: true, title: 'Vecchio', isbn: '978-0-306-40615-7' }, c);
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual((await r.json()).book.isbn, '9780306406157');
+  const again = await call('POST', '/api/books', { manual: true, title: 'Altro', isbn: '9780306406157' }, c);
+  assert.strictEqual((await again.json()).status, 'exists');
+  assert.strictEqual((await call('POST', '/api/books', { manual: true, title: 'X', isbn: '123' }, c)).status, 400);
+});

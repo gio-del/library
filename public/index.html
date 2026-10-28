@@ -32,10 +32,12 @@
     <video id="video" playsinline muted hidden></video>
     <button id="camera" type="button">Apri la fotocamera</button>
     <form id="manual-form">
-      <label>ISBN <input id="isbn" inputmode="numeric" autocomplete="off" placeholder="978…"></label>
+      <label>ISBN, titolo o autore <input id="isbn" autocomplete="off" placeholder="978… oppure titolo"></label>
       <button type="submit">Controlla</button>
     </form>
     <p id="scan-msg" class="msg" role="status"></p>
+    <ul id="results"></ul>
+    <button id="add-manual" type="button">Non lo trovo: aggiungilo a mano</button>
     <article id="verdict" hidden>
       <h2 id="verdict-text"></h2>
       <img id="verdict-cover" alt="" hidden>
@@ -54,6 +56,25 @@
       <button id="card-again" type="button" hidden>Cerca di nuovo</button>
     </article>
   </section>
+  <section id="manual" hidden>
+    <h2>Aggiungi a mano</h2>
+    <form id="m-form">
+      <label>Titolo (obbligatorio) <input id="m-title" required maxlength="300"></label>
+      <label>Autori (separati da virgola) <input id="m-authors"></label>
+      <label>Editore <input id="m-publisher"></label>
+      <label>Anno <input id="m-year" inputmode="numeric"></label>
+      <label>Edizione <input id="m-edition"></label>
+      <label>Lingua <input id="m-language"></label>
+      <label>Pagine <input id="m-pages" inputmode="numeric"></label>
+      <label>ISBN (se c’è) <input id="m-isbn" inputmode="numeric" autocomplete="off"></label>
+      <label>Note <textarea id="m-notes" rows="3" maxlength="1000"></textarea></label>
+      <label class="btn">Copertina (foto o immagine) <input id="m-cover" type="file" accept="image/*" hidden></label>
+      <p id="m-cover-name"></p>
+      <button type="submit">Salva</button>
+      <button id="m-cancel" type="button">Annulla</button>
+    </form>
+    <p id="m-msg" class="msg" role="status"></p>
+  </section>
   <section id="detail" hidden>
     <button id="d-back" type="button">← Torna all’elenco</button>
     <img id="d-cover" alt="" hidden>
@@ -70,6 +91,7 @@
       <label>Collana <input id="e-series"></label>
       <label>Pagine <input id="e-pages" inputmode="numeric"></label>
       <label>Lingua <input id="e-language"></label>
+      <label>Note <textarea id="e-notes" rows="3" maxlength="1000"></textarea></label>
       <button type="submit">Salva</button>
       <button id="d-cancel" type="button">Annulla</button>
     </form>

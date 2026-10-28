@@ -15,6 +15,9 @@ let notesSaved = '';
 let notesTimer = null;
 let notesBusy = false;
 
+const hasIsbn = (b) => /^\d{13}$/.test(b.isbn);
+const needsRetry = (b) => hasIsbn(b) && (b.lookup === 'failed' || !b.cover);
+
 async function api(method, url, body) {
   const res = await fetch(url, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
@@ -26,7 +29,7 @@ async function api(method, url, body) {
 function say(el, text, err) { el.textContent = text; el.classList.toggle('err', !!err); }
 
 function show(name) {
-  for (const s of ['login', 'scan', 'lib', 'detail', 'notes']) $(s).hidden = s !== name;
+  for (const s of ['login', 'scan', 'lib', 'detail', 'manual', 'notes']) $(s).hidden = s !== name;
   $('nav').hidden = name === 'login';
   if (name !== 'scan') stopCamera();
 }
@@ -38,9 +41,9 @@ function fillCard(book) {
   $('card').hidden = false;
   $('card-title').textContent = book.title || 'Titolo sconosciuto';
   $('card-authors').textContent = book.authors.join(', ');
-  $('card-meta').textContent = [book.publisher, book.year, book.isbn].filter(Boolean).join(' · ');
+  $('card-meta').textContent = [book.publisher, book.year, hasIsbn(book) ? book.isbn : ''].filter(Boolean).join(' · ');
   $('card-cover').hidden = !book.cover;
-  $('card-again').hidden = book.lookup !== 'failed' && !!book.cover;
+  $('card-again').hidden = !needsRetry(book);
   if (book.cover) $('card-cover').src = `/covers/${book.cover}`;
   paintState(book);
 }
@@ -77,7 +80,7 @@ function verdict(yes, book) {
   $('verdict-cover').hidden = !(yes && book.cover);
   if (yes && book.cover) $('verdict-cover').src = `/covers/${book.cover}`;
   current = book;
-  $('verdict-add').hidden = yes;
+  $('verdict-add').hidden = yes || !book.isbn;
   $('verdict-add').disabled = saving;
   $('verdict-open').hidden = !yes;
   $('verdict-add').dataset.isbn = book.isbn || '';
@@ -91,8 +94,40 @@ function validIsbn13(code) {
   return String((10 - (sum % 10)) % 10) === code[12];
 }
 
+// Ricerca per titolo o autore tra i libri già in libreria.
+async function searchText(q) {
+  const seq = ++checkSeq;
+  $('card').hidden = true;
+  $('verdict').hidden = true;
+  say($('scan-msg'), 'Cerco…');
+  try {
+    const found = await api('GET', `/api/books?q=${encodeURIComponent(q)}`);
+    if (seq !== checkSeq) return;
+    if (!found.length) {
+      verdict(false, {});
+      $('verdict-text').textContent = 'Non ce l’hai';
+      say($('scan-msg'), '');
+      return;
+    }
+    say($('scan-msg'), found.length === 1 ? 'Ce l’hai già' : `${found.length} libri trovati`);
+    for (const b of found.slice(0, 20)) {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = [b.title || 'Senza titolo', (b.authors || []).join(', ')].filter(Boolean).join(' — ');
+      btn.addEventListener('click', () => { verdict(true, b); });
+      li.append(btn);
+      $('results').append(li);
+    }
+    if (found.length === 1) verdict(true, found[0]);
+  } catch (e) { if (seq === checkSeq) say($('scan-msg'), e.message, true); }
+}
+
+function looksLikeIsbn(text) { return /^[\d\sXx-]{10,17}$/.test(text.trim()); }
+
 async function checkIsbn(isbn) {
   const seq = ++checkSeq;
+  $('results').replaceChildren();
   $('card').hidden = true;
   say($('scan-msg'), 'Controllo…');
   try {
@@ -169,13 +204,13 @@ function renderLibrary() {
   say($('lib-msg'), !libBooks.length ? 'La libreria è vuota' : shown.length ? `${shown.length} libri` : 'Nessun libro in questo elenco');
   const grid = $('grid');
   grid.replaceChildren();
-  $('retry-all').hidden = !libBooks.some((b) => b.lookup === 'failed' || !b.cover);
+  $('retry-all').hidden = !libBooks.some(needsRetry);
   for (const b of shown) {
     const li = document.createElement('li');
     if (b.cover) { const img = document.createElement('img'); img.src = `/covers/${b.cover}`; img.alt = ''; li.append(img); }
-    else { const ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = b.title || b.isbn; li.append(ph); }
+    else { const ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = b.title || (hasIsbn(b) ? b.isbn : 'Senza titolo'); li.append(ph); }
     const badge = document.createElement('span'); badge.className = b.read ? 'badge read' : 'badge'; badge.textContent = b.read ? 'Letto' : 'Da leggere';
-    const t = document.createElement('span'); t.className = 't'; t.textContent = b.title || b.isbn;
+    const t = document.createElement('span'); t.className = 't'; t.textContent = b.title || (hasIsbn(b) ? b.isbn : 'Senza titolo');
     const a = document.createElement('span'); a.className = 'a'; a.textContent = b.authors.join(', ');
     const rd = document.createElement('button'); rd.type = 'button'; rd.textContent = b.read ? 'Segna da leggere' : 'Segna letto';
     rd.addEventListener('click', async () => {
@@ -183,14 +218,14 @@ function renderLibrary() {
     });
     const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = 'Elimina';
     del.addEventListener('click', async () => {
-      if (!confirm(`Eliminare «${b.title || b.isbn}»?`)) return;
+      if (!confirm(`Eliminare «${b.title || (hasIsbn(b) ? b.isbn : 'Senza titolo')}»?`)) return;
       del.disabled = true;
       try { await api('DELETE', `/api/books/${b.isbn}`); libBooks = libBooks.filter((x) => x.isbn !== b.isbn); renderLibrary(); } catch (e) { say($('lib-msg'), e.message, true); del.disabled = false; }
     });
     li.classList.add('open-card');
     li.addEventListener('click', (ev) => { if (ev.target.closest && ev.target.closest('button')) return; openDetail(b); });
     li.append(badge, t, a, rd);
-    if (b.lookup === 'failed' || !b.cover) {
+    if (needsRetry(b)) {
       const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Cerca di nuovo';
       again.addEventListener('click', async () => {
         again.disabled = true;
@@ -221,7 +256,7 @@ function detailRows(b) {
   return [
     ['Autori', (b.authors || []).join(', ')], ['Edizione', b.edition], ['Editore', b.publisher], ['Anno', b.year],
     ['Collana', b.series], ['Pagine', b.pages], ['Lingua', b.language],
-    ['ISBN-13', b.isbn], ['ISBN-10', isbn10Of(b.isbn)],
+    ['Note', b.notes], ['ISBN-13', hasIsbn(b) ? b.isbn : ''], ['ISBN-10', isbn10Of(b.isbn)],
     ['Fonte dei dati', SOURCES[b.source] || b.source], ['Aggiunto il', added],
   ].filter(([, v]) => v);
 }
@@ -251,7 +286,7 @@ function openDetail(b) {
   paintDetail(b);
 }
 
-const EDIT = ['title', 'edition', 'publisher', 'year', 'series', 'pages', 'language'];
+const EDIT = ['title', 'edition', 'publisher', 'year', 'series', 'pages', 'language', 'notes'];
 
 function editDetail() {
   for (const k of EDIT) $(`e-${k}`).value = detailBook[k] || '';
@@ -319,7 +354,7 @@ $('d-read').addEventListener('click', async () => {
   try { const b = await toggleRead(detailBook, $('d-read')); if (b) paintDetail(b); } catch (e) { say($('d-msg'), e.message, true); }
 });
 $('d-delete').addEventListener('click', async () => {
-  if (!confirm(`Eliminare «${detailBook.title || detailBook.isbn}»?`)) return;
+  if (!confirm(`Eliminare «${detailBook.title || 'Senza titolo'}»?`)) return;
   try {
     await api('DELETE', `/api/books/${detailBook.isbn}`);
     libBooks = libBooks.filter((x) => x.isbn !== detailBook.isbn);
@@ -408,6 +443,58 @@ $('tab-notes').addEventListener('click', loadNotes);
 $('notes-text').addEventListener('input', () => { clearTimeout(notesTimer); notesTimer = setTimeout(saveNotes, 800); });
 $('notes-text').addEventListener('blur', saveNotes);
 if (document.addEventListener) document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNotes(); });
+const MANUAL = ['title', 'publisher', 'year', 'edition', 'language', 'pages', 'notes'];
+
+function openManual() {
+  const t = $('isbn').value.trim();
+  for (const k of MANUAL) $(`m-${k}`).value = '';
+  $('m-authors').value = '';
+  $('m-isbn').value = looksLikeIsbn(t) ? t : '';
+  $('m-title').value = looksLikeIsbn(t) ? '' : t;
+  $('m-cover').value = '';
+  $('m-cover-name').textContent = '';
+  say($('m-msg'), '');
+  show('manual');
+}
+
+async function uploadCover(book, file) {
+  const blob = await toJpeg(file);
+  const res = await fetch(`/api/books/${book.isbn}/cover`, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: blob });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Errore');
+  return data.book;
+}
+
+async function saveManual(ev) {
+  ev.preventDefault();
+  const body = { manual: true, isbn: $('m-isbn').value, authors: $('m-authors').value.split(',').map((x) => x.trim()).filter(Boolean) };
+  for (const k of MANUAL) body[k] = $(`m-${k}`).value;
+  const btn = ev.target.querySelector ? ev.target.querySelector('button[type=submit]') : null;
+  if (btn) btn.disabled = true;
+  try {
+    let r;
+    try { r = await api('POST', '/api/books', body); } catch (e) {
+      if (e.status !== 409) throw e;
+      if (!confirm(`${e.message}. Aggiungerlo comunque?`)) { say($('m-msg'), e.message, true); return; }
+      r = await api('POST', '/api/books', { ...body, force: true });
+    }
+    let book = r.book;
+    let coverErr = false;
+    const file = $('m-cover').files && $('m-cover').files[0];
+    if (file && r.status === 'saved') {
+      try { book = await uploadCover(book, file); } catch (e) { coverErr = true; say($('scan-msg'), `Salvato, ma la copertina no: ${e.message}`, true); }
+    }
+    libBooks = libBooks.filter((x) => x.isbn !== book.isbn).concat(book);
+    show('scan');
+    verdict(true, book);
+    if (!coverErr) say($('scan-msg'), r.status === 'saved' ? 'Salvato' : 'Già in libreria');
+  } catch (e) { say($('m-msg'), e.message, true); } finally { if (btn) btn.disabled = false; }
+}
+
+$('add-manual').addEventListener('click', openManual);
+$('m-form').addEventListener('submit', saveManual);
+$('m-cancel').addEventListener('click', () => show('scan'));
+$('m-cover').addEventListener('change', () => { const f = $('m-cover').files && $('m-cover').files[0]; $('m-cover-name').textContent = f ? f.name : ''; });
 $('tab-scan').addEventListener('click', () => show('scan'));
 $('tab-lib').addEventListener('click', loadLibrary);
 $('verdict-open').addEventListener('click', () => { if (current) fillCard(current); });
@@ -424,7 +511,13 @@ $('verdict-add').addEventListener('click', async () => {
   } catch (e) { saving = false; say($('scan-msg'), e.message, true); b.disabled = false; }
 });
 $('camera').addEventListener('click', () => { if (!scanning) startCamera(); });
-$('manual-form').addEventListener('submit', (e) => { e.preventDefault(); checkIsbn($('isbn').value); });
+$('manual-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('isbn').value.trim();
+  if (!v) return;
+  $('results').replaceChildren();
+  if (looksLikeIsbn(v)) checkIsbn(v); else searchText(v);
+});
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
