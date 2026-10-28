@@ -4,13 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Libreria</title>
-<meta name="theme-color" content="#2d3a4a">
+<meta name="theme-color" content="#492151">
+<link rel="icon" href="/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-maskable-192.png">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header>
+  <img id="emblem" src="/emblem.png" alt="">
   <h1>Libreria</h1>
   <nav id="nav" hidden>
     <button id="tab-scan" type="button">Scansiona</button>
@@ -21,6 +23,7 @@
 </header>
 <main>
   <section id="login" hidden>
+    <img id="login-logo" src="/logo" alt="Logo della libreria">
     <form id="login-form">
       <label>Utente <input id="user" autocomplete="username"></label>
       <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
