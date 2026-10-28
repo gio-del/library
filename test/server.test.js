@@ -118,7 +118,8 @@ test('app installabile: manifest, icone e sw.js senza sessione; il resto resta c
       assert.deepStrictEqual([...Buffer.from(await r.arrayBuffer()).subarray(1, 4)], [0x50, 0x4e, 0x47]);
     }
   }
-  assert.strictEqual((await call('GET', '/icon.svg')).headers.get('content-type'), 'image/svg+xml');
+  assert.strictEqual(m.theme_color, '#492151');
+  assert.strictEqual((await call('GET', '/emblem.png')).headers.get('content-type'), 'image/png');
   assert.strictEqual((await call('GET', '/sw.js')).status, 200);
   assert.strictEqual((await call('GET', '/offline.html')).status, 200);
   assert.strictEqual((await call('GET', '/api/books')).status, 401);
@@ -126,6 +127,20 @@ test('app installabile: manifest, icone e sw.js senza sessione; il resto resta c
   for (const p of ['/package.json', '/server.js', '/icon.gif', '/../server.js', '/Icon-192.png']) {
     assert.strictEqual((await call('GET', p)).status, 404, p);
   }
+});
+
+test('logo: senza sessione; quello dei dati se c\'è (png prima di jpg), altrimenti l\'emblema', async (t) => {
+  const { call, dataDir } = await start(t);
+  const emblem = fs.readFileSync(path.join(__dirname, '..', 'public', 'emblem.png'));
+  const get = async () => { const r = await call('GET', '/logo'); return [r.status, r.headers.get('content-type'), Buffer.from(await r.arrayBuffer())]; };
+  assert.deepStrictEqual(await get(), [200, 'image/png', emblem]);
+  fs.writeFileSync(path.join(dataDir, 'logo.jpg'), JPEG);
+  assert.deepStrictEqual(await get(), [200, 'image/jpeg', JPEG]);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  fs.writeFileSync(path.join(dataDir, 'logo.png'), png);
+  assert.deepStrictEqual(await get(), [200, 'image/png', png]);
+  assert.strictEqual((await call('GET', '/logo.jpg')).status, 404);
+  assert.strictEqual((await call('POST', '/logo')).status, 405);
 });
 
 test('GET libro e anteprima: presente, ISBN-10 equivalente, assente, non valido, senza sessione; nessuna scrittura', async (t) => {

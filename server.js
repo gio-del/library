@@ -322,6 +322,13 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       if (!auth.valid(token(req))) return send(res, 401, 'Accesso richiesto');
       try { return send(res, 200, await fsp.readFile(path.join(coversDir, `${cover[1]}.jpg`)), { 'content-type': 'image/jpeg' }); } catch { return send(res, 404, 'Non trovato'); }
     }
+    // Logo della schermata di accesso: quello dei dati (personale, fuori dal repo) se c'è, altrimenti l'emblema.
+    if (p === '/logo') {
+      for (const [f, type] of [['logo.png', 'image/png'], ['logo.jpg', 'image/jpeg']]) {
+        try { return send(res, 200, await fsp.readFile(path.join(config.dataDir, f)), { 'content-type': type }); } catch { /* prossimo */ }
+      }
+      return send(res, 200, await fsp.readFile(path.join(publicDir, 'emblem.png')), { 'content-type': 'image/png' });
+    }
     const name = p === '/' ? 'index.html' : p.slice(1);
     if (!/^[a-z0-9-]+\.(html|css|js|webmanifest|png|svg)$/.test(name)) return send(res, 404, 'Non trovato');
     try { return send(res, 200, await fsp.readFile(path.join(publicDir, name)), { 'content-type': TYPES[path.extname(name)] }); } catch { return send(res, 404, 'Non trovato'); }

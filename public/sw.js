@@ -1,8 +1,8 @@
 'use strict';
 // Solo la pagina «Server non raggiungibile» è in cache; /api/* e copertine mai (dati dietro login).
 // Se cambia la lista dei file, cambia il nome della cache.
-const CACHE = 'libreria-v1';
-const FILES = ['/offline.html', '/style.css'];
+const CACHE = 'libreria-v2';
+const FILES = ['/offline.html', '/style.css', '/emblem.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
