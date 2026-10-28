@@ -19,7 +19,7 @@ const EDITABLE = { title: 300, authors: 200, publisher: 200, year: 20, edition: 
 const KEY = '(?:\\d{13}|m[0-9a-f]{12})';
 const keyRe = (before, after = '') => new RegExp(`^${before}(${KEY})${after}$`);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
 };
 const HEADERS = {
   'content-security-policy': "default-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
@@ -337,9 +337,15 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       }
       return send(res, 200, await fsp.readFile(path.join(publicDir, 'emblem.png')), { 'content-type': 'image/png' });
     }
-    const name = p === '/' ? 'index.html' : p.slice(1);
-    if (!/^[a-z0-9-]+\.(html|css|js|webmanifest|png|svg)$/.test(name)) return send(res, 404, 'Non trovato');
-    try { return send(res, 200, await fsp.readFile(path.join(publicDir, name)), { 'content-type': TYPES[path.extname(name)] }); } catch { return send(res, 404, 'Non trovato'); }
+    // File della build (frontend/, Vite): i file con hash stanno in /assets/ e non cambiano mai.
+    const asset = /^\/assets\/([A-Za-z0-9_.-]+\.(?:css|js|woff2|svg|png))$/.exec(p);
+    const name = asset ? `assets/${asset[1]}` : p.slice(1);
+    const isFile = asset || /^[a-z0-9-]+\.(html|css|js|webmanifest|png|svg)$/.test(name);
+    // Indirizzi dell'app (/libreria, /libro/123…): la pagina è la stessa, il router sceglie la schermata.
+    if (!isFile && !path.extname(p)) return fsp.readFile(path.join(publicDir, 'index.html')).then((b) => send(res, 200, b, { 'content-type': TYPES['.html'] }), () => send(res, 404, 'Non trovato'));
+    if (!isFile) return send(res, 404, 'Non trovato');
+    const extra = { 'content-type': TYPES[path.extname(name)], ...(asset ? { 'cache-control': 'public, max-age=31536000, immutable' } : {}) };
+    try { return send(res, 200, await fsp.readFile(path.join(publicDir, name)), extra); } catch { return send(res, 404, 'Non trovato'); }
   }
 
   return http.createServer((req, res) => {

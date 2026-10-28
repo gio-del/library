@@ -1,12 +1,31 @@
 #!/bin/sh
-# CI del Project: nessun segreto, esce al primo controllo fallito.
+# CI del Project (contratto ./ci [sezione…], nessun argomento = tutto): nessun segreto,
+# esce al primo controllo fallito. Rete solo per le dipendenze del frontend bloccate da lockfile.
+#   frontend   lint, test e build di frontend/ (la build finisce in public/)
+#   backend    sintassi e test del server (serve la build del frontend: ./ci frontend prima)
 set -eu
 cd "$(dirname "$0")"
 
-echo "== sintassi =="
-for f in server.js lib/*.js public/*.js; do
-  [ -f "$f" ] && node --check "$f"
-done
+frontend() {
+	cd frontend
+	npm ci --no-audit --no-fund
+	npm run lint
+	npm test
+	npm run build
+	cd ..
+}
 
-echo "== test =="
-node --test
+backend() {
+	for f in server.js lib/*.js; do
+		[ -f "$f" ] && node --check "$f"
+	done
+	node --test test/*.test.js
+}
+
+[ $# -gt 0 ] || set -- frontend backend
+for section in "$@"; do
+	case $section in
+	frontend | backend) echo "== ./ci $section" && "$section" ;;
+	*) echo "./ci: sezione sconosciuta '$section' (frontend, backend)" >&2 && exit 2 ;;
+	esac
+done
