@@ -268,7 +268,7 @@ test('note: salvataggio, ricarica e versione sovrascritta recuperabile', async (
 
 test('generi: classificati dalle fonti, correzione a mano non sovrascritta dalla riclassificazione', async (t) => {
   const f = (url) => (String(url).includes('/isbn/9780306406157.json')
-    ? json({ title: 'T', authors: [], subjects: ['Horror tales', 'Ghost stories', 'Cooking'] })
+    ? json({ title: 'T', authors: [], subjects: ['Horror tales', 'Ghost stories', 'Quilting'] })
     : fakeFetch(url));
   const { call, login } = await start(t, f);
   const sid = await login();
@@ -283,15 +283,28 @@ test('generi: classificati dalle fonti, correzione a mano non sovrascritta dalla
   assert.deepStrictEqual(r.books[0].genres, ['Romance']);
 });
 
-test('generi: libro già presente senza generi viene classificato, i non riconosciuti vanno in «Altro»', async (t) => {
+test('generi: libro già presente senza generi viene classificato, senza indizi nessun genere, mai «Altro»', async (t) => {
   const { classify } = require('../lib/genres');
-  assert.deepStrictEqual(classify([]), ['Altro'], 'mai «Senza genere»');
+  assert.deepStrictEqual(classify([]), [], 'senza indizi: da classificare');
   assert.deepStrictEqual(classify([], { dewey: '823.7' }), ['Narrativa']);
   assert.deepStrictEqual(classify(['BUCHI NERI'], { dewey: '523.8875' }), ['Saggio']);
   assert.deepStrictEqual(classify([], { dewey: '851.914' }), ['Poesia']);
   assert.deepStrictEqual(classify([], { dewey: '741.5' }), ['Fumetti']);
   assert.deepStrictEqual(classify([], { title: 'Manuale di filosofia' }), ['Saggio']);
-  assert.deepStrictEqual(classify(['Cooking']), ['Altro']);
+  assert.deepStrictEqual(classify(['Quilting']), []);
+  assert.deepStrictEqual(classify(['Zorba']), []);
+  assert.deepStrictEqual(classify(['Fantasy fiction', 'Dragons -- Fiction', 'Magic -- Fiction']), ['Fantasy']);
+  assert.deepStrictEqual(classify(['Romantasy']), ['Romantasy']);
+  assert.deepStrictEqual(classify(['Young adult fiction', 'Fantasy']).sort(), ['Fantasy', 'Young adult']);
+  assert.deepStrictEqual(classify(['Dystopias', 'Fiction']).sort(), ['Distopico', 'Narrativa']);
+  assert.deepStrictEqual(classify(['Love stories', 'Fiction']).sort(), ['Narrativa', 'Romance']);
+  assert.deepStrictEqual(classify(['Narrativa fantasy']), ['Fantasy']);
+  assert.deepStrictEqual(classify(['Fiction']), ['Narrativa']);
+  assert.deepStrictEqual(classify(['Classic literature']), ['Classici']);
+  assert.deepStrictEqual(classify(['Philosophy']), ['Saggio']);
+  assert.deepStrictEqual(classify([], { title: 'Threshing Day' }), []);
+  assert.deepStrictEqual(classify([], { title: 'Threshing Day', description: 'A young witch and her dragon.' }), ['Fantasy']);
+  assert.ok(!classify(['Cooking', 'Fiction']).includes('Altro'));
   assert.deepStrictEqual(classify(['Fantasy fiction', 'Romance']).sort(), ['Fantasy', 'Romance']);
   const f = (url) => (String(url).includes('/isbn/9780306406157.json')
     ? json({ title: 'T', authors: [], subjects: ['Science fiction'] }) : fakeFetch(url));

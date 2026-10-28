@@ -111,7 +111,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     Object.assign(book, { title: found.title, authors: found.authors, publisher: found.publisher, year: found.year, source: found.source });
     book.subjects = found.subjects || [];
     book.dewey = found.dewey || '';
-    if (!book.genresManual) book.genres = classify(book.subjects, { dewey: book.dewey, title: book.title });
+    if (!book.genresManual) book.genres = classify(book.subjects, { dewey: book.dewey, title: book.title, description: book.description });
     if (found.cover) await saveCover(book, found.cover);
   }
 
@@ -153,7 +153,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       }
       const cur = await store.get(b.isbn);
       if (!cur || cur.genresManual) continue;
-      const genres = classify(subjects, { dewey, title: cur.title });
+      const genres = classify(subjects, { dewey, title: cur.title, description: cur.description });
       const next = { ...cur, genres };
       if (Array.isArray(subjects)) next.subjects = subjects;
       if (dewey) next.dewey = dewey;
@@ -287,7 +287,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       }
       if ('genres' in b) {
         if (!Array.isArray(b.genres) || b.genres.length > MAX_GENRES || b.genres.some((g) => typeof g !== 'string')) return send(res, 400, { error: 'Generi non validi' });
-        patch.genres = [...new Set(b.genres.map((g) => g.trim().slice(0, 40)).filter(Boolean))];
+        patch.genres = [...new Set(b.genres.map((g) => g.trim().slice(0, 40)).filter((g) => g && g !== 'Altro' && g !== 'Senza genere'))];
         patch.genresManual = true;
       }
       const f = cleanFields(b);
