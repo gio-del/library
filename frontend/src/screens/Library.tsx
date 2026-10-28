@@ -1,90 +1,93 @@
-import { useEffect, useState } from 'react';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
-import { bookTitle, filterBooks, genreCounts, matchRead, needsRetry, type ReadFilter } from '../lib/books';
+import { bookGenres, bookTitle, genreCounts, matchRead, type ReadFilter } from '../lib/books';
 import { cn } from '../lib/cn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
-import { useLock } from '../hooks/useLock';
-import { Badge, Button, Cover, Msg } from '../components/ui';
+import { Badge, Cover, Input, Msg } from '../components/ui';
+import { Sheet } from '../components/Sheet';
 
-const FILTERS: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
+const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
+const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const matchText = (b: Book, q: string) => !q || norm([b.title, ...b.authors].filter(Boolean).join(' ')).includes(q);
 
 export function Library() {
-  const { books, loaded, load, setAll, upsert, remove } = useBooks();
-  const [filter, setFilter] = useState<ReadFilter>('all');
+  const { books, loaded, load } = useBooks();
+  const [state, setState] = useState<ReadFilter>('all');
   const [genre, setGenre] = useState('');
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const say = (t: string, e = false) => { setMsg(t); setErr(e); };
-  const lock = useLock();
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState('');
 
-  useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) say(e.message, true); }); }, [load]);
+  useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
 
-  const shown = filterBooks(books, filter, genre);
-  const count = (f: ReadFilter) => books.filter((b) => matchRead(b, f)).length;
-  const status = !loaded ? '' : !books.length ? 'La libreria è vuota' : shown.length ? `${shown.length} libri` : 'Nessun libro in questo elenco';
+  const q = norm(query.trim());
+  // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
+  const searched = useMemo(() => books.filter((b) => matchText(b, q)), [books, q]);
+  const shown = searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)));
+  const genres = genreCounts(searched, state, genre);
+  const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
+  const active = state !== 'all' || genre !== '' || q !== '';
 
-  async function run(label: string, fn: () => Promise<string>) {
-    await lock('run', async () => {
-      setBusy(true);
-      say(label);
-      try { say(await fn()); } catch (e) { say((e as Error).message, true); }
-      setBusy(false);
-    });
-  }
-
-  async function toggle(b: Book) {
-    await lock(b.isbn, async () => {
-      try { upsert((await api<{ book: Book }>('PATCH', `/api/books/${b.isbn}`, { read: !b.read })).book); } catch (e) { say((e as Error).message, true); }
-    });
-  }
-  async function del(b: Book) {
-    if (!confirm(`Eliminare «${bookTitle(b)}»?`)) return;
-    try { await api('DELETE', `/api/books/${b.isbn}`); remove(b.isbn); } catch (e) { say((e as Error).message, true); }
-  }
-
-  const chip = (on: boolean) => cn('min-h-11 rounded-lg px-3 text-white', on ? 'bg-blue outline-[3px] outline-gold' : 'bg-plum-2');
+  let status = '';
+  if (err) status = err;
+  else if (loaded && !books.length) status = 'La libreria è vuota. Scansiona un libro per iniziare.';
+  else if (loaded && !shown.length) status = 'Nessun libro corrisponde ai filtri.';
 
   return (
     <section>
-      <Msg text={msg || status} error={err} />
-      <div role="group" aria-label="Filtro" className="mb-3 flex gap-1.5">
-        {FILTERS.map(([f, label]) => <button key={f} type="button" className={cn(chip(filter === f), 'flex-1')} onClick={() => setFilter(f)}>{label} ({count(f)})</button>)}
-      </div>
-      {books.length > 0 && (
-        <div role="group" aria-label="Genere" className="mb-3 flex flex-wrap gap-1.5">
-          <button type="button" className={chip(genre === '')} onClick={() => setGenre('')}>Tutti i generi ({count(filter)})</button>
-          {genreCounts(books, filter, genre).map(([g, c]) => <button key={g} type="button" className={chip(genre === g)} onClick={() => setGenre(g)}>{g} ({c})</button>)}
+      <div className="sticky top-[calc(3.75rem+3px+env(safe-area-inset-top))] z-10 -mx-4 bg-cream px-4 pb-2 pt-1">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
+            <Input type="search" aria-label="Cerca per titolo o autore" placeholder="Cerca per titolo o autore" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-10 pr-11 [&::-webkit-search-cancel-button]:hidden" />
+            {query && <button type="button" aria-label="Cancella la ricerca" onClick={() => setQuery('')} className="absolute right-0 top-0 flex size-12 items-center justify-center text-muted"><X aria-hidden className="size-5" /></button>}
+          </div>
+          <button type="button" aria-label="Filtri" onClick={() => setOpen(true)} className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-plum-2 text-white">
+            <SlidersHorizontal aria-hidden />
+            {genre && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
+          </button>
         </div>
-      )}
-      {books.some(needsRetry) && (
-        <Button className="mb-2 w-full" disabled={busy} onClick={() => void run('Cerco i libri incompleti…', async () => {
-          const r = await api<{ found: number; retried: number }>('POST', '/api/books/lookup-failed');
-          await load();
-          return `Aggiornati ${r.found} libri su ${r.retried}`;
-        })}>Cerca di nuovo i libri senza dati o copertina</Button>
-      )}
-      <Button className="mb-3 w-full" disabled={busy} onClick={() => void run('Rileggo i generi…', async () => {
-        const r = await api<{ books: Book[]; changed: number }>('POST', '/api/books/classify');
-        setAll(r.books);
-        return `Generi aggiornati su ${r.changed} libri`;
-      })}>Rileggi i generi (senza toccare quelli corretti)</Button>
-      <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 p-0">
+        <div role="group" aria-label="Stato" className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+          {STATES.map(([f, label]) => (
+            <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 shrink-0 rounded-full px-4 text-sm font-medium', state === f ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{label} ({count(f)})</button>
+          ))}
+          {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum">{genre}<X aria-hidden className="size-4" /></button>}
+        </div>
+      </div>
+
+      {status && <Msg text={status} error={!!err} />}
+      <p aria-live="polite" className="sr-only">{loaded && shown.length ? `${shown.length} libri` : ''}</p>
+      <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 pt-2 sm:grid-cols-3">
         {shown.map((b) => (
-          <li key={b.isbn} className="relative flex flex-col items-center gap-1 rounded-lg bg-paper p-2 text-center shadow">
-            <span className="absolute left-3 top-3"><Badge read={b.read} /></span>
-            <Link to={`/libro/${b.isbn}`} className="flex w-full flex-col items-center gap-1">
-              <Cover book={b} />
-              <span className="font-semibold [overflow-wrap:anywhere]">{bookTitle(b)}</span>
-              <span className="text-sm text-muted">{b.authors.join(', ')}</span>
+          <li key={b.isbn}>
+            <Link to={`/libro/${b.isbn}`} className="relative flex h-full flex-col gap-1.5 rounded-xl bg-paper p-2 shadow-sm">
+              <Badge read={b.read} className="absolute left-3.5 top-3.5 z-10 shadow" />
+              <Cover book={b}>{bookTitle(b)}</Cover>
+              <span className="line-clamp-2 text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{bookTitle(b)}</span>
+              <span className="line-clamp-1 text-sm text-muted">{b.authors.join(', ')}</span>
             </Link>
-            <Button onClick={() => void toggle(b)}>{b.read ? 'Segna da leggere' : 'Segna letto'}</Button>
-            <Button variant="danger" onClick={() => void del(b)}>Elimina</Button>
           </li>
         ))}
       </ul>
+
+      <Sheet open={open} onOpenChange={setOpen} title="Filtri">
+        <p className="mb-2 text-sm font-medium text-muted">Genere</p>
+        <div role="group" aria-label="Genere" className="flex flex-col gap-2">
+          <GenreRow label="Tutti i generi" count={count(state)} on={genre === ''} onPick={() => { setGenre(''); setOpen(false); }} />
+          {genres.map(([g, c]) => <GenreRow key={g} label={g} count={c} on={genre === g} onPick={() => { setGenre(g); setOpen(false); }} />)}
+        </div>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setQuery(''); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
+      </Sheet>
     </section>
+  );
+}
+
+function GenreRow({ label, count, on, onPick }: { label: string; count: number; on: boolean; onPick(): void }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onPick} className={cn('flex min-h-12 items-center justify-between rounded-xl px-4 text-left', on ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>
+      <span className="font-medium">{label}</span><span className={cn('text-sm', on ? 'text-white/80' : 'text-muted')}>{count}</span>
+    </button>
   );
 }

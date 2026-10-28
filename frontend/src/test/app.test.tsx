@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
@@ -35,16 +35,72 @@ describe('app', () => {
     expect(await screen.findByRole('button', { name: 'Accedi' })).toBeInTheDocument();
   });
 
-  it('la libreria elenca i libri e i filtri di stato li restringono', async () => {
+  it('la barra in basso ha tre voci e segna quella corrente', async () => {
+    server();
+    open('/libreria');
+    const nav = await screen.findByRole('navigation', { name: 'Sezioni' });
+    const links = within(nav).getAllByRole('link');
+    expect(links.map((l) => l.textContent)).toEqual(['Libreria', 'Scansiona', 'Note']);
+    expect(links[0]).toHaveAttribute('aria-current', 'page');
+    await userEvent.click(links[1]);
+    expect(links[1]).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('la schermata Libreria non ha più i bottoni larghi di Gestione', async () => {
+    server();
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    expect(screen.queryByRole('button', { name: /Rileggi i generi/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Cerca di nuovo i libri/ })).not.toBeInTheDocument();
+  });
+
+  it('i chip di stato restringono l’elenco e contano', async () => {
     server();
     open('/libreria');
     expect(await screen.findByText('Mansfield Park')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Letti \(1\)/ }));
     expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
     expect(screen.getByText('Narnia')).toBeInTheDocument();
   });
 
-  it('un doppio tocco su «Segna letto» manda una sola richiesta', async () => {
+  it('la ricerca trova per titolo e autore, senza badare agli accenti', async () => {
+    server();
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.type(screen.getByRole('searchbox'), 'LEWIS');
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    expect(screen.getByText('Narnia')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
+    expect(screen.getByText('Mansfield Park')).toBeInTheDocument();
+  });
+
+  it('il foglio Filtri sceglie il genere, mostra il puntino e si azzera', async () => {
+    server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Sapiens', authors: ['Harari'], genres: ['Saggio'], cover: 'c.jpg' }] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    expect(screen.queryByTestId('filter-dot')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Saggio/ }));
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    expect(screen.getByText('Sapiens')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-dot')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Saggio' }));
+    expect(screen.getByText('Mansfield Park')).toBeInTheDocument();
+    expect(screen.queryByTestId('filter-dot')).not.toBeInTheDocument();
+  });
+
+  it('Gestione chiede conferma e poi rilegge i generi', async () => {
+    const calls = server({ 'POST /api/books/classify': { books: [{ ...BOOKS[0], genres: ['Classici'] }], changed: 1 } });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Altro' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Rileggi i generi/ }));
+    expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
+    await userEvent.click(await screen.findByRole('button', { name: 'Rileggi i generi' }));
+    expect(await screen.findByText('Generi aggiornati su 1 libri')).toBeInTheDocument();
+  });
+
+  it('un doppio tocco su «Segna come letto» manda una sola richiesta', async () => {
     const calls = server({ 'PATCH /api/books/9780306406157': { book: { ...BOOKS[0], read: true } } });
     open('/libro/9780306406157');
     const btn = await screen.findByRole('button', { name: 'Segna come letto' });
@@ -53,11 +109,23 @@ describe('app', () => {
     expect(calls.filter((c) => c.startsWith('PATCH')).length).toBe(1);
   });
 
-  it('«Rileggi i generi» aggiorna l’elenco', async () => {
-    server({ 'POST /api/books/classify': { books: [{ ...BOOKS[0], genres: ['Classici'] }], changed: 1 } });
-    open('/libreria');
-    await userEvent.click(await screen.findByRole('button', { name: /Rileggi i generi/ }));
-    expect(await screen.findByText('Generi aggiornati su 1 libri')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Classici (1)' })).toBeInTheDocument();
+  it('eliminare un libro passa da una conferma e torna all’elenco', async () => {
+    const calls = server({ 'DELETE /api/books/9780306406157': {} });
+    open('/libro/9780306406157');
+    await userEvent.click(await screen.findByRole('button', { name: /Elimina/ }));
+    expect(calls.some((c) => c.startsWith('DELETE'))).toBe(false);
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    expect(await screen.findByRole('navigation', { name: 'Sezioni' })).toBeInTheDocument();
+    expect(calls.filter((c) => c.startsWith('DELETE')).length).toBe(1);
+  });
+
+  it('il modulo a mano mostra l’errore sotto il campo e non invia', async () => {
+    const calls = server();
+    open('/scansiona/manuale');
+    await userEvent.click(await screen.findByRole('button', { name: 'Salva' }));
+    expect(await screen.findByText('Il titolo è obbligatorio')).toBeInTheDocument();
+    expect(screen.getByLabelText('Titolo (obbligatorio)')).toHaveAttribute('aria-invalid', 'true');
+    expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
   });
 });
