@@ -285,7 +285,12 @@ test('generi: classificati dalle fonti, correzione a mano non sovrascritta dalla
 
 test('generi: libro già presente senza generi viene classificato, i non riconosciuti vanno in «Altro»', async (t) => {
   const { classify } = require('../lib/genres');
-  assert.deepStrictEqual(classify([]), ['Senza genere']);
+  assert.deepStrictEqual(classify([]), ['Altro'], 'mai «Senza genere»');
+  assert.deepStrictEqual(classify([], { dewey: '823.7' }), ['Narrativa']);
+  assert.deepStrictEqual(classify(['BUCHI NERI'], { dewey: '523.8875' }), ['Saggio']);
+  assert.deepStrictEqual(classify([], { dewey: '851.914' }), ['Poesia']);
+  assert.deepStrictEqual(classify([], { dewey: '741.5' }), ['Fumetti']);
+  assert.deepStrictEqual(classify([], { title: 'Manuale di filosofia' }), ['Saggio']);
   assert.deepStrictEqual(classify(['Cooking']), ['Altro']);
   assert.deepStrictEqual(classify(['Fantasy fiction', 'Romance']).sort(), ['Fantasy', 'Romance']);
   const f = (url) => (String(url).includes('/isbn/9780306406157.json')
@@ -337,4 +342,28 @@ test('libro a mano con ISBN: usa l’ISBN e non lo ripete', async (t) => {
   const again = await call('POST', '/api/books', { manual: true, title: 'Altro', isbn: '9780306406157' }, c);
   assert.strictEqual((await again.json()).status, 'exists');
   assert.strictEqual((await call('POST', '/api/books', { manual: true, title: 'X', isbn: '123' }, c)).status, 400);
+});
+
+test('generi: libri salvati «Senza genere» si rileggono da SBN (Dewey) con «Rileggi i generi», senza toccare quelli a mano', async (t) => {
+  const f = (url) => {
+    const u = String(url);
+    if (u.includes('openlibrary.org')) return new Response('', { status: 404 });
+    if (u.includes('full.json')) return json({ classificazioneDewey: '823.7 (23.) NARRATIVA INGLESE, 1800-1837' });
+    if (u.includes('opac.sbn.it')) return json({ numFound: 1, briefRecords: [{ codiceIdentificativo: 'IT\\ICCU\\VIA\\1', titolo: 'Mansfield Park / J. Austen' }] });
+    return fakeFetch(url);
+  };
+  const { call, login, dataDir } = await start(t, f);
+  fs.writeFileSync(path.join(dataDir, 'books.json'), JSON.stringify([
+    { isbn: '9788822787774', title: 'Mansfield Park', authors: [], cover: null, genres: ['Senza genere'], subjects: null },
+    { isbn: '9788804706250', title: 'Narnia', authors: [], cover: null, genres: ['Senza genere'], subjects: [] },
+    { isbn: '9780306406157', title: 'Mano', authors: [], cover: null, genres: ['Romance'], genresManual: true },
+  ]));
+  const sid = await login();
+  const r = await (await call('POST', '/api/books/classify', {}, sid)).json();
+  const by = Object.fromEntries(r.books.map((b) => [b.isbn, b]));
+  assert.deepStrictEqual(by['9788822787774'].genres, ['Narrativa']);
+  assert.strictEqual(by['9788822787774'].dewey, '823.7');
+  assert.deepStrictEqual(by['9788804706250'].genres, ['Narrativa']);
+  assert.deepStrictEqual(by['9780306406157'].genres, ['Romance']);
+  for (const b of r.books) assert.ok(!b.genres.includes('Senza genere'));
 });
