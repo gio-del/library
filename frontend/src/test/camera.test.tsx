@@ -5,6 +5,7 @@ import { CoverPicker } from '../components/CoverPicker';
 function track() { return { stop: vi.fn() }; }
 function mockCamera(gum: () => Promise<unknown>) {
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn(gum) } });
+  HTMLMediaElement.prototype.play = vi.fn(async () => {});
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ drawImage: vi.fn() })) as never;
   HTMLCanvasElement.prototype.toBlob = vi.fn((cb: BlobCallback) => cb(new Blob(['x'], { type: 'image/jpeg' }))) as never;
 }
@@ -62,7 +63,7 @@ describe('Scatta ora', () => {
     render(<CoverPicker onPick={() => {}} />);
     await userEvent.click(screen.getByRole('button', { name: /Scatta ora/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Permesso alla fotocamera negato/);
-    await userEvent.click(screen.getByRole('button', { name: 'Chiudi', hidden: false }).closest('button')!);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Chiudi' })[0]);
     expect(screen.getByText('Scegli dalla galleria')).toBeInTheDocument();
   });
 
