@@ -1,7 +1,7 @@
-import { DropdownMenu } from 'radix-ui';
-import { EllipsisVertical, Library, LogOut, NotebookPen, RefreshCw, ScanBarcode, Tags, type LucideIcon } from 'lucide-react';
+import { Dialog, DropdownMenu } from 'radix-ui';
+import { EllipsisVertical, X, Library, LogOut, NotebookPen, RefreshCw, ScanBarcode, Tags, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { api } from '../lib/api';
 import { cn } from '../lib/cn';
 import { needsRetry } from '../lib/books';
@@ -67,8 +67,22 @@ export function TopBar() {
   const item = 'flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 text-ink outline-none data-[highlighted]:bg-lilac-soft';
   return (
     <header className="sticky top-0 z-20 flex items-center gap-2 border-b-[3px] border-gold bg-plum px-4 pb-2 pt-[calc(.5rem+env(safe-area-inset-top))] text-white">
-      <img src="/emblem.png" alt="" className="size-11 rounded-full bg-cream p-[3px]" />
-      <h1 className="mr-auto font-script text-[1.7rem] font-semibold tracking-wide text-gold">Libreria</h1>
+      <Dialog.Root>
+        <Dialog.Trigger aria-label="Mostra il logo ingrandito" className="flex size-11 shrink-0 items-center justify-center rounded-full">
+          <img src="/emblem.png" alt="" className="size-11 rounded-full bg-cream p-[3px]" />
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/70 motion-safe:animate-[fade-in_.2s_ease-out]" />
+          <Dialog.Content aria-describedby={undefined} className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-cream p-4 shadow-[0_0_60px_20px_rgb(0_0_0/.55)] motion-safe:animate-[fade-in_.2s_ease-out]">
+            <Dialog.Title className="sr-only">Logo della Libreria</Dialog.Title>
+            <img src="/emblem.png" alt="Logo della Libreria" className="size-[min(80vw,24rem)] object-contain" />
+            <Dialog.Close aria-label="Chiudi" className="absolute -right-2 -top-2 flex size-11 items-center justify-center rounded-full border-2 border-gold bg-plum text-white shadow-lg"><X aria-hidden /></Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <Link to="/libreria" aria-label="Torna alla Libreria" onClick={() => window.scrollTo({ top: 0 })} className="mr-auto flex min-h-11 items-center">
+        <h1 className="font-script text-[1.7rem] font-semibold tracking-wide text-gold">Libreria</h1>
+      </Link>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger aria-label="Altro" className="flex size-11 items-center justify-center rounded-full text-white data-[state=open]:bg-plum-2"><EllipsisVertical aria-hidden /></DropdownMenu.Trigger>
         <DropdownMenu.Portal>
