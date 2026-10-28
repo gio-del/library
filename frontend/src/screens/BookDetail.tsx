@@ -2,7 +2,7 @@ import { ImagePlus, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
-import { bookGenres, bookTitle, hasIsbn, needsRetry } from '../lib/books';
+import { GENRES, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry } from '../lib/books';
 import { isbn10Of } from '../lib/isbn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -37,6 +37,7 @@ export function BookDetail() {
   const book = books.find((b) => b.isbn === isbn);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [picked, setPicked] = useState<string[]>([]);
   const [formErr, setFormErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [coverV, setCoverV] = useState(0);
@@ -60,7 +61,8 @@ export function BookDetail() {
   }
 
   function startEdit() {
-    const f: Record<string, string> = { authors: (book!.authors || []).join(', '), genres: (book!.genres || []).join(', ') };
+    const f: Record<string, string> = { authors: (book!.authors || []).join(', ') };
+    setPicked(bookGenres(book!).filter((g) => g !== UNCLASSIFIED));
     for (const k of EDIT) f[k] = String(book![k] ?? '');
     setForm(f);
     setFormErr('');
@@ -71,8 +73,7 @@ export function BookDetail() {
     ev.preventDefault();
     if (!form.title.trim()) { setFormErr('Il titolo non può essere vuoto'); return; }
     const body: Record<string, unknown> = { authors: list(form.authors) };
-    const genres = list(form.genres);
-    if (genres.join('|') !== (book!.genres || []).join('|')) body.genres = genres;
+    if (picked.join('|') !== bookGenres(book!).filter((g) => g !== UNCLASSIFIED).join('|')) body.genres = picked;
     for (const k of EDIT) body[k] = form[k];
     if (await patch(body, 'Salvato')) setEditing(false);
   }
@@ -112,7 +113,20 @@ export function BookDetail() {
         <form onSubmit={(e) => void save(e)}>
           <Field label="Titolo" error={formErr}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
           <Field label="Autori (separati da virgola)"><Input value={form.authors} onChange={(e) => setForm({ ...form, authors: e.target.value })} /></Field>
-          <Field label="Generi (separati da virgola)"><Input value={form.genres} onChange={(e) => setForm({ ...form, genres: e.target.value })} /></Field>
+          <fieldset className="mt-4 min-w-0 border-0 p-0">
+            <legend className="mb-1 text-sm font-medium text-muted">Generi (fino a {MAX_GENRES})</legend>
+            <div className="flex flex-wrap gap-2">
+              {[...GENRES, ...picked.filter((g) => !GENRES.includes(g))].map((g) => {
+                const on = picked.includes(g);
+                return (
+                  <label key={g} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-sm font-medium ${on ? 'bg-gold text-plum' : 'bg-lilac-soft text-plum'}`}>
+                    <input type="checkbox" className="size-4" checked={on} disabled={!on && picked.length >= MAX_GENRES} onChange={() => setPicked(on ? picked.filter((x) => x !== g) : [...picked, g])} />
+                    {g}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           {EDIT.filter((k) => k !== 'title' && k !== 'notes').map((k) => (
             <Field key={k} label={LABELS[k]}><Input value={form[k]} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></Field>
           ))}

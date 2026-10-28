@@ -146,4 +146,40 @@ describe('app', () => {
     expect(screen.getByLabelText('Titolo (obbligatorio)')).toHaveAttribute('aria-invalid', 'true');
     expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
   });
+
+  it('il filtro «Da classificare» compare solo se c’è un libro senza genere', async () => {
+    server();
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: /Filtri/ }));
+    expect(screen.queryByRole('button', { name: /Da classificare/ })).not.toBeInTheDocument();
+  });
+
+  it('i libri senza genere (o con «Altro») si trovano in «Da classificare»', async () => {
+    server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Threshing Day', authors: [], genres: ['Altro'], cover: 'c.jpg' }] });
+    open('/libreria');
+    await screen.findByText('Threshing Day');
+    await userEvent.click(screen.getByRole('button', { name: /Filtri/ }));
+    expect(screen.queryByRole('button', { name: /^Altro/ })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /Da classificare/ }));
+    expect(screen.getByText('Threshing Day')).toBeInTheDocument();
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+  });
+
+  it('dalla scheda si scelgono a mano più generi e si salvano', async () => {
+    const book = { isbn: '9780306406171', title: 'Threshing Day', authors: [], genres: [] as string[] };
+    const sent: unknown[] = [];
+    const calls = server({ 'GET /api/books': [book], 'PATCH /api/books/9780306406171': { book: { ...book, genres: ['Fantasy', 'Romantasy'] } } });
+    const f = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === 'PATCH') sent.push(JSON.parse(String(init.body))); return (f as typeof fetch)(url, init); }));
+    open('/libro/9780306406171');
+    await userEvent.click(await screen.findByRole('button', { name: /Modifica/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Fantasy' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Romantasy' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    await screen.findByText('Salvato');
+    expect(sent).toHaveLength(1);
+    expect((sent[0] as { genres: string[] }).genres).toEqual(['Fantasy', 'Romantasy']);
+    expect(calls.filter((c) => c.startsWith('PATCH')).length).toBe(1);
+  });
 });

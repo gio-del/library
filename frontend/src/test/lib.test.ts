@@ -19,9 +19,11 @@ describe('isbn', () => {
 });
 
 describe('books', () => {
-  it('«Senza genere» e libri senza generi finiscono in «Altro»', () => {
-    expect(bookGenres(b({ genres: ['Senza genere'] }))).toEqual(['Altro']);
-    expect(bookGenres(b({}))).toEqual(['Altro']);
+  it('«Altro», «Senza genere» e libri senza generi sono «Da classificare»', () => {
+    expect(bookGenres(b({ genres: ['Senza genere'] }))).toEqual(['Da classificare']);
+    expect(bookGenres(b({ genres: ['Altro'] }))).toEqual(['Da classificare']);
+    expect(bookGenres(b({ genres: ['Altro', 'Fantasy'] }))).toEqual(['Fantasy']);
+    expect(bookGenres(b({}))).toEqual(['Da classificare']);
     expect(bookGenres(b({ genres: ['Saggio'] }))).toEqual(['Saggio']);
   });
   it('filtra per stato e genere e conta i generi sul filtro attivo', () => {

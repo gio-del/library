@@ -4,10 +4,15 @@ export const hasIsbn = (b: Book) => /^\d{13}$/.test(b.isbn);
 export const needsRetry = (b: Book) => hasIsbn(b) && (b.lookup === 'failed' || !b.cover);
 export const bookTitle = (b: Book) => b.title || (hasIsbn(b) ? b.isbn : 'Senza titolo');
 
-// «Senza genere» non esiste più: i libri salvati prima con quel genere compaiono sotto «Altro» finché non si rileggono i generi.
+// I generi che il server sa assegnare (lib/genres.js); la scheda del libro li offre per la correzione a mano.
+export const GENRES = ['Fantasy', 'Romantasy', 'Young adult', 'Distopico', 'Fantascienza', 'Giallo', 'Romance', 'Horror', 'Storico', 'Classici', 'Narrativa', 'Biografia', 'Saggio', 'Fumetti', 'Poesia', 'Teatro', 'Ragazzi'];
+export const MAX_GENRES = 5;
+export const UNCLASSIFIED = 'Da classificare';
+
+// «Altro» e «Senza genere» non esistono più (anche nei dati vecchi): senza generi il libro è «Da classificare».
 export function bookGenres(b: Book): string[] {
-  const g = (Array.isArray(b.genres) ? b.genres : []).filter((x) => x !== 'Senza genere');
-  return g.length ? g : ['Altro'];
+  const g = (Array.isArray(b.genres) ? b.genres : []).filter((x) => x !== 'Senza genere' && x !== 'Altro');
+  return g.length ? g : [UNCLASSIFIED];
 }
 
 export type ReadFilter = 'all' | 'toread' | 'read';
