@@ -34,19 +34,13 @@
   <section id="scan" hidden>
     <video id="video" playsinline muted hidden></video>
     <button id="camera" type="button">Apri la fotocamera</button>
-    <form id="manual-form">
-      <label>ISBN, titolo o autore <input id="isbn" autocomplete="off" placeholder="978… oppure titolo"></label>
-      <button type="submit">Controlla</button>
-    </form>
     <p id="scan-msg" class="msg" role="status"></p>
-    <ul id="results"></ul>
-    <button id="add-manual" type="button">Non lo trovo: aggiungilo a mano</button>
     <article id="verdict" hidden>
       <h2 id="verdict-text"></h2>
       <img id="verdict-cover" alt="" hidden>
       <p id="verdict-title"></p>
       <p id="verdict-authors"></p>
-      <button id="verdict-add" type="button" hidden>Salva</button>
+      <button id="verdict-add" type="button" hidden>Aggiungi alla libreria</button>
       <button id="verdict-open" type="button" hidden>Apri scheda</button>
     </article>
     <article id="card" hidden>
@@ -58,6 +52,12 @@
       <button id="card-read" type="button"></button>
       <button id="card-again" type="button" hidden>Cerca di nuovo</button>
     </article>
+    <form id="manual-form">
+      <label>ISBN, titolo o autore <input id="isbn" autocomplete="off" placeholder="978… oppure titolo"></label>
+      <button type="submit">Controlla</button>
+    </form>
+    <ul id="results"></ul>
+    <button id="add-manual" type="button">Non lo trovo: aggiungilo a mano</button>
   </section>
   <section id="manual" hidden>
     <h2>Aggiungi a mano</h2>
