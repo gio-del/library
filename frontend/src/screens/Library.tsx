@@ -49,12 +49,16 @@ export function Library() {
             {genre && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
           </button>
         </div>
-        <div role="group" aria-label="Stato" className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+        <div role="group" aria-label="Stato" className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-lilac-soft p-1">
           {STATES.map(([f, label]) => (
-            <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 shrink-0 rounded-full px-4 text-sm font-medium', state === f ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{label} ({count(f)})</button>
+            <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-plum')}>{label} ({count(f)})</button>
           ))}
-          {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum">{genre}<X aria-hidden className="size-4" /></button>}
         </div>
+        {genre && (
+          <div data-testid="active-filters" className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>
+          </div>
+        )}
       </div>
 
       {status && <Msg text={status} error={!!err} />}
