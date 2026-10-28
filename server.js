@@ -3,6 +3,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { normalize } = require('./lib/isbn');
 const { createStore } = require('./lib/store');
 const { createAuth } = require('./lib/auth');
@@ -11,7 +12,10 @@ const { lookup, fetchCover } = require('./lib/lookup');
 const MAX_BODY = 4096;
 const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
 // campi modificabili a mano dalla scheda, con la lunghezza massima
-const EDITABLE = { title: 300, authors: 200, publisher: 200, year: 20, edition: 200, series: 200, pages: 10, language: 50 };
+const EDITABLE = { title: 300, authors: 200, publisher: 200, year: 20, edition: 200, series: 200, pages: 10, language: 50, notes: 1000 };
+// chiave di un libro: ISBN-13, oppure «m» + 12 esadecimali per i libri aggiunti a mano senza ISBN
+const KEY = '(?:\\d{13}|m[0-9a-f]{12})';
+const keyRe = (before, after = '') => new RegExp(`^${before}(${KEY})${after}$`);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml',
 };
@@ -126,6 +130,54 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     return (await store.replace(book)) || null;
   }
 
+  // Valida e ripulisce i campi di testo modificabili presenti in `b`.
+  function cleanFields(b) {
+    const fields = {};
+    for (const [k, max] of Object.entries(EDITABLE)) {
+      if (!(k in b)) continue;
+      if (k === 'authors') {
+        if (!Array.isArray(b.authors) || b.authors.length > 20 || b.authors.some((a) => typeof a !== 'string')) return { error: 'Autori non validi' };
+        fields.authors = b.authors.map((a) => a.trim().slice(0, max)).filter(Boolean);
+      } else {
+        if (typeof b[k] !== 'string') return { error: 'Campo non valido' };
+        fields[k] = b[k].trim().slice(0, max);
+      }
+    }
+    return { fields };
+  }
+
+  const sameText = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+  // Libro inserito a mano: titolo obbligatorio, ISBN facoltativo; avvisa se titolo e autori esistono già.
+  async function addManual(b) {
+    const f = cleanFields(b);
+    if (f.error) return { status: 400, body: { error: f.error } };
+    const fields = f.fields;
+    if (!fields.title) return { status: 400, body: { error: 'Il titolo è obbligatorio' } };
+    let isbn = null;
+    if (typeof b.isbn === 'string' && b.isbn.trim()) {
+      isbn = normalize(b.isbn);
+      if (!isbn) return { status: 400, body: { error: 'ISBN non valido' } };
+      const have = await store.get(isbn);
+      if (have) return { status: 200, body: { status: 'exists', book: have } };
+    }
+    const authors = fields.authors || [];
+    if (b.force !== true) {
+      const dup = (await store.list()).find((x) => sameText(x.title, fields.title) && sameText((x.authors || []).join(', '), authors.join(', ')));
+      if (dup) return { status: 409, body: { status: 'duplicate', error: 'Esiste già un libro con lo stesso titolo e autore', book: dup } };
+    }
+    const book = { isbn: isbn || `m${crypto.randomBytes(6).toString('hex')}`, title: '', authors: [], publisher: '', year: '', cover: null, read: false, manual: true, ...fields, added: new Date(now()).toISOString() };
+    if (!(await store.add(book))) return { status: 200, body: { status: 'exists', book: await store.get(book.isbn) } };
+    return { status: 201, body: { status: 'saved', book } };
+  }
+
+  // Ricerca testuale (senza accenti e maiuscole) su titolo, autori e ISBN.
+  const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  function matches(book, q) {
+    const hay = fold([book.title, ...(book.authors || []), book.isbn, book.series].join(' '));
+    return fold(q).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+  }
+
   async function api(req, res, url) {
     const p = url.pathname;
     if (req.method === 'GET' && p === '/api/auth/status') return send(res, 200, { authenticated: auth.valid(token(req)) });
@@ -141,19 +193,28 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       auth.logout(token(req));
       return send(res, 200, { ok: true }, { 'set-cookie': 'sid=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' });
     }
-    if (req.method === 'GET' && p === '/api/books') return send(res, 200, await store.list());
+    if (req.method === 'GET' && p === '/api/books') {
+      const q = (url.searchParams.get('q') || '').slice(0, 100);
+      const all = await store.list();
+      return send(res, 200, q.trim() ? all.filter((x) => matches(x, q)) : all);
+    }
     if (req.method === 'POST' && p === '/api/books') {
-      const isbn = normalize((await readJson(req)).isbn);
+      const body = await readJson(req);
+      if (body.manual === true) {
+        const r = await addManual(body);
+        return send(res, r.status, r.body);
+      }
+      const isbn = normalize(body.isbn);
       if (!isbn) return send(res, 400, { error: 'ISBN non valido' });
       const r = await addBook(isbn);
       return send(res, r.status, r.body);
     }
     if (req.method === 'POST' && p === '/api/books/lookup-failed') {
       const out = [];
-      for (const b of await store.list()) if (b.lookup === 'failed' || !b.cover) { const r = await retryBook(b.isbn); if (r) out.push(r); }
+      for (const b of await store.list()) if (/^\d{13}$/.test(b.isbn) && (b.lookup === 'failed' || !b.cover)) { const r = await retryBook(b.isbn); if (r) out.push(r); }
       return send(res, 200, { retried: out.length, found: out.filter((b) => b.lookup !== 'failed').length, books: out });
     }
-    const lk = /^\/api\/books\/(\d{13})\/lookup$/.exec(p);
+    const lk = /^\/api\/books\/(\d{13})\/lookup$/.exec(p); // solo con ISBN
     if (req.method === 'POST' && lk) {
       const book = await retryBook(lk[1]);
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
@@ -162,7 +223,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     if (req.method === 'GET' && one) {
       let raw = one[2];
       try { raw = decodeURIComponent(raw); } catch { /* resta grezzo, non valido */ }
-      const isbn = normalize(raw);
+      const isbn = one[1] === 'books' && /^m[0-9a-f]{12}$/.test(raw) ? raw : normalize(raw);
       if (!isbn) return send(res, 400, { error: 'ISBN non valido' });
       if (one[1] === 'books') {
         const book = await store.get(isbn);
@@ -174,7 +235,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
         return send(res, 200, found ? { isbn, title: found.title, authors: found.authors } : { isbn, title: '', authors: [] });
       } catch { return send(res, 200, { isbn, title: '', authors: [] }); }
     }
-    const pt = /^\/api\/books\/(\d{13})$/.exec(p);
+    const pt = keyRe('\\/api\\/books\\/').exec(p);
     if (req.method === 'PATCH' && pt) {
       const b = await readJson(req);
       const patch = {};
@@ -182,22 +243,15 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
         if (typeof b.read !== 'boolean') return send(res, 400, { error: 'Stato non valido' });
         patch.read = b.read;
       }
-      for (const [k, max] of Object.entries(EDITABLE)) {
-        if (!(k in b)) continue;
-        if (k === 'authors') {
-          if (!Array.isArray(b.authors) || b.authors.length > 20 || b.authors.some((a) => typeof a !== 'string')) return send(res, 400, { error: 'Autori non validi' });
-          patch.authors = b.authors.map((a) => a.trim().slice(0, max)).filter(Boolean);
-        } else {
-          if (typeof b[k] !== 'string') return send(res, 400, { error: 'Campo non valido' });
-          patch[k] = b[k].trim().slice(0, max);
-        }
-      }
+      const f = cleanFields(b);
+      if (f.error) return send(res, 400, { error: f.error });
+      Object.assign(patch, f.fields);
       if (!Object.keys(patch).length) return send(res, 400, { error: 'Stato non valido' });
       const old = await store.get(pt[1]);
       const book = old && (await store.replace({ ...old, ...patch }));
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
     }
-    const cv = /^\/api\/books\/(\d{13})\/cover$/.exec(p);
+    const cv = keyRe('\\/api\\/books\\/', '\\/cover').exec(p);
     if (req.method === 'PUT' && cv) {
       const img = await readRaw(req, MAX_COVER_UPLOAD);
       if (img.length < 4 || img[0] !== 0xff || img[1] !== 0xd8 || img[2] !== 0xff) return send(res, 400, { error: 'Immagine non valida (serve un JPEG)' });
@@ -208,9 +262,9 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       if (!book.cover) return send(res, 500, { error: 'Copertina non salvata' });
       return send(res, 200, { book: await store.replace(book) });
     }
-    const m = /^\/api\/books\/([\d-]{10,17}|\d{9}X)$/.exec(p);
+    const m = /^\/api\/books\/([\d-]{10,17}|\d{9}X|m[0-9a-f]{12})$/.exec(p);
     if (req.method === 'DELETE' && m) {
-      const isbn = normalize(m[1]);
+      const isbn = /^m/.test(m[1]) ? m[1] : normalize(m[1]);
       const gone = isbn && (await store.remove(isbn));
       if (!gone) return send(res, 404, { error: 'Non trovato' });
       if (gone.cover) await fsp.rm(path.join(coversDir, gone.cover), { force: true });
@@ -224,7 +278,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     const p = url.pathname;
     if (p.startsWith('/api/')) return api(req, res, url);
     if (req.method !== 'GET') return send(res, 405, 'Metodo non consentito');
-    const cover = /^\/covers\/(\d{13})\.jpg$/.exec(p);
+    const cover = keyRe('\\/covers\\/', '\\.jpg').exec(p);
     if (cover) {
       if (!auth.valid(token(req))) return send(res, 401, 'Accesso richiesto');
       try { return send(res, 200, await fsp.readFile(path.join(coversDir, `${cover[1]}.jpg`)), { 'content-type': 'image/jpeg' }); } catch { return send(res, 404, 'Non trovato'); }
