@@ -268,7 +268,7 @@ test('note: salvataggio, ricarica e versione sovrascritta recuperabile', async (
 
 test('generi: classificati dalle fonti, correzione a mano non sovrascritta dalla riclassificazione', async (t) => {
   const f = (url) => (String(url).includes('/isbn/9780306406157.json')
-    ? json({ title: 'T', authors: [], subjects: ['Horror tales', 'Ghost stories', 'Cooking'] })
+    ? json({ title: 'T', authors: [], subjects: ['Horror tales', 'Ghost stories', 'Quilting'] })
     : fakeFetch(url));
   const { call, login } = await start(t, f);
   const sid = await login();
