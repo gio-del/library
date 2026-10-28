@@ -110,7 +110,8 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     if (!found) { book.lookup = 'failed'; return; }
     Object.assign(book, { title: found.title, authors: found.authors, publisher: found.publisher, year: found.year, source: found.source });
     book.subjects = found.subjects || [];
-    if (!book.genresManual) book.genres = classify(book.subjects);
+    book.dewey = found.dewey || '';
+    if (!book.genresManual) book.genres = classify(book.subjects, { dewey: book.dewey, title: book.title });
     if (found.cover) await saveCover(book, found.cover);
   }
 
@@ -141,14 +142,21 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     for (const b of await store.list()) {
       if (b.genresManual) continue;
       let subjects = b.subjects;
-      if (!Array.isArray(subjects) && b.lookup !== 'failed' && /^\d{13}$/.test(b.isbn)) {
-        try { subjects = ((await lookup(b.isbn, fetchFn)) || {}).subjects; } catch { /* resta com'è */ }
+      let dewey = b.dewey;
+      // si rilegge la fonte per chi non ha soggetti né Dewey (libri salvati prima che SBN desse il genere)
+      if ((!Array.isArray(subjects) || (!subjects.length && !dewey)) && b.lookup !== 'failed' && /^\d{13}$/.test(b.isbn)) {
+        try {
+          const f = (await lookup(b.isbn, fetchFn, { cover: false })) || {};
+          if (Array.isArray(f.subjects)) subjects = f.subjects;
+          if (f.dewey) dewey = f.dewey;
+        } catch { /* resta com'è */ }
       }
       const cur = await store.get(b.isbn);
       if (!cur || cur.genresManual) continue;
-      const genres = classify(subjects);
+      const genres = classify(subjects, { dewey, title: cur.title });
       const next = { ...cur, genres };
       if (Array.isArray(subjects)) next.subjects = subjects;
+      if (dewey) next.dewey = dewey;
       if (JSON.stringify(next) !== JSON.stringify(cur)) { await store.replace(next); changed++; }
     }
     return changed;
@@ -190,7 +198,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const dup = (await store.list()).find((x) => sameText(x.title, fields.title) && sameText((x.authors || []).join(', '), authors.join(', ')));
       if (dup) return { status: 409, body: { status: 'duplicate', error: 'Esiste già un libro con lo stesso titolo e autore', book: dup } };
     }
-    const book = { isbn: isbn || `m${crypto.randomBytes(6).toString('hex')}`, title: '', authors: [], publisher: '', year: '', cover: null, read: false, manual: true, genres: classify([]), ...fields, added: new Date(now()).toISOString() };
+    const book = { isbn: isbn || `m${crypto.randomBytes(6).toString('hex')}`, title: '', authors: [], publisher: '', year: '', cover: null, read: false, manual: true, genres: classify([], { title: fields.title }), ...fields, added: new Date(now()).toISOString() };
     if (!(await store.add(book))) return { status: 200, body: { status: 'exists', book: await store.get(book.isbn) } };
     return { status: 201, body: { status: 'saved', book } };
   }

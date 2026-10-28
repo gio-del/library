@@ -20,6 +20,8 @@ function fake({ ol, sbn }) {
     return new Response('', { status: 404 });
   };
 }
+// SBN con record completo (Dewey): brief per l'ISBN, full per il bid
+const sbnFull = (dewey) => (url) => (String(url).includes('full.json') ? json({ classificazioneDewey: dewey }) : json({ numFound: 1, briefRecords: [{ codiceIdentificativo: 'IT\\ICCU\\VIA\\0626314', ...sbnRec.briefRecords[0] }] }));
 const notFound = () => new Response('', { status: 404 });
 const timeout = () => Promise.reject(new DOMException('timeout', 'TimeoutError'));
 
@@ -129,4 +131,24 @@ test('copertina: un ISBN 979 non interroga Amazon', async () => {
 test('copertina: errore di Amazon = nessuna copertina', async () => {
   const calls = [];
   assert.strictEqual(await fetchCover('9780306406157', coverFetch({ amazon: timeout, calls })), null);
+});
+
+test('SBN: la classificazione Dewey del record completo dà soggetto e numero', async () => {
+  const f = (url) => (String(url).includes('openlibrary.org/isbn/') ? notFound() : sbnFull('823.7 (23.) NARRATIVA INGLESE, 1800-1837')(url));
+  const r = await lookup(ISBN, f);
+  assert.deepStrictEqual([r.source, r.dewey, r.subjects], ['sbn', '823.7', ['NARRATIVA INGLESE, 1800-1837']]);
+});
+
+test('Open Library senza soggetti: il genere si chiede a SBN; con soggetti SBN non è interrogato', async () => {
+  const f = (url) => (String(url).includes('openlibrary.org/isbn/') ? json({ title: 'T', publish_date: '2001' }) : sbnFull('523.8875 (23.) BUCHI NERI')(url));
+  const r = await lookup(ISBN, f);
+  assert.deepStrictEqual([r.source, r.dewey, r.subjects], ['openlibrary', '523.8875', ['BUCHI NERI']]);
+  const g = fake({ ol: json({ title: 'T', subjects: ['Fantasy'] }), sbn: () => { throw new Error('non doveva essere chiamato'); } });
+  assert.deepStrictEqual((await lookup(ISBN, g)).subjects, ['Fantasy']);
+});
+
+test('SBN: record completo non leggibile o Dewey assente: il libro resta, senza Dewey; bid strano ignorato', async () => {
+  const bad = (url) => (String(url).includes('full.json') ? new Response('x', { status: 500 }) : json({ numFound: 1, briefRecords: [{ codiceIdentificativo: 'a b/../c', titolo: 'T' }] }));
+  const r = await lookup(ISBN, (url) => (String(url).includes('openlibrary.org/isbn/') ? notFound() : bad(url)));
+  assert.deepStrictEqual([r.title, r.dewey, r.subjects], ['T', '', []]);
 });

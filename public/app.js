@@ -194,7 +194,11 @@ function stopCamera() {
   $('video').hidden = true;
 }
 
-const bookGenres = (b) => (Array.isArray(b.genres) && b.genres.length ? b.genres : ['Senza genere']);
+// «Senza genere» non esiste più: i libri salvati prima con quel genere compaiono sotto «Altro» finché non si rileggono i generi
+const bookGenres = (b) => {
+  const g = (Array.isArray(b.genres) ? b.genres : []).filter((x) => x !== 'Senza genere');
+  return g.length ? g : ['Altro'];
+};
 const matchRead = (b) => filter === 'all' || (filter === 'read') === !!b.read;
 
 // Pulsanti dei generi con il numero di libri, calcolati sul filtro letto / da leggere attivo.
