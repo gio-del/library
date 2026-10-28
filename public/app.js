@@ -75,7 +75,7 @@ function verdict(yes, book) {
   const v = $('verdict');
   v.hidden = false;
   v.className = yes ? 'yes' : 'no';
-  $('verdict-text').textContent = yes ? 'Ce l’hai già' : 'Non ce l’hai';
+  $('verdict-text').textContent = yes ? 'Ce l’hai già' : (book.isbn ? 'Non ce l’hai: lo aggiungo?' : 'Non ce l’hai');
   $('verdict-title').textContent = book.title || '';
   $('verdict-authors').textContent = (book.authors || []).join(', ');
   $('verdict-cover').hidden = !(yes && book.cover);
@@ -544,7 +544,8 @@ $('verdict-add').addEventListener('click', async () => {
     const r = await api('POST', '/api/books', { isbn: b.dataset.isbn });
     saving = false;
     verdict(true, r.book);
-    say($('scan-msg'), r.status === 'saved' ? 'Salvato' : 'Già in libreria');
+    if (r.status === 'saved') $('verdict-text').textContent = 'Aggiunto alla libreria';
+    say($('scan-msg'), '');
   } catch (e) { saving = false; say($('scan-msg'), e.message, true); b.disabled = false; }
 });
 $('camera').addEventListener('click', () => { if (!scanning) startCamera(); });
