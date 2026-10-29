@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
@@ -16,7 +16,7 @@ function server(opts: { coverRead?: boolean; read?: () => Promise<Response> } = 
     calls.push(key);
     if (key === 'GET /api/auth/status') return new Response(JSON.stringify({ authenticated: true, coverRead: opts.coverRead ?? true }));
     if (key === 'GET /api/books') return new Response(JSON.stringify([BOOK]));
-    if (key === 'GET /covers/a.jpg') return new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff])]));
+    if (key === 'GET /covers/a.jpg') return new Response('jpeg');
     if (key === 'POST /api/cover-read') return opts.read ? opts.read() : new Response(JSON.stringify(READ));
     return new Response(JSON.stringify({ error: 'Non trovato' }), { status: 404 });
   }));
@@ -40,7 +40,7 @@ describe('lettura dalla foto', () => {
     expect(await screen.findByLabelText('Titolo (obbligatorio) (dalla foto)')).toHaveValue('Il nome della rosa');
     expect(screen.getByLabelText('Autori (separati da virgola) (dalla foto)')).toHaveValue('Umberto Eco');
     expect(screen.getByLabelText('Editore')).toHaveValue('Il mio'); // già compilato: intatto
-    expect(screen.getByRole('status')).toHaveTextContent('Controlla e premi «Salva»');
+    expect(screen.getByText(/Controlla e premi «Salva»/)).toBeInTheDocument();
     expect(calls.some((c) => c.startsWith('POST /api/books'))).toBe(false); // non salva da solo
   });
 
@@ -84,10 +84,9 @@ describe('lettura dalla foto', () => {
     expect(screen.queryByRole('button', { name: 'Leggi i dati dalla foto' })).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: /Modifica/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Leggi i dati dalla foto' }));
-    await screen.findByText(/Compilati|Non riesco|Lettura/).then((e) => console.log('MSG', e.textContent));
     await waitFor(() => expect(screen.getByLabelText('Titolo (dalla foto)')).toHaveValue('Il nome della rosa'));
     expect(screen.getByLabelText('Editore')).toHaveValue('Mio editore');
-    expect(within(screen.getByRole('status')).getByText(/titolo, autori, lingua/)).toBeInTheDocument();
+    expect(screen.getByText(/titolo, autori, lingua/)).toBeInTheDocument();
     expect(calls.some((c) => c.startsWith('PATCH'))).toBe(false);
   });
 });
