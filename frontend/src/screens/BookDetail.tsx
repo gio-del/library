@@ -8,6 +8,7 @@ import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
 import { CoverPicker } from '../components/CoverPicker';
+import { CoverViewer } from '../components/CoverViewer';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
 import { useToast } from '../components/Toast';
@@ -144,7 +145,7 @@ export function BookDetail() {
   return (
     <SubPage title={bookTitle(book)} fallback="/libreria">
       <div className="flex flex-col gap-3">
-        {book.cover && <img src={`/covers/${book.cover}${coverV ? `?v=${coverV}` : ''}`} alt="" className="mx-auto max-h-96 max-w-full rounded-lg shadow" />}
+        {book.cover && <CoverViewer src={`/covers/${book.cover}${coverV ? `?v=${coverV}` : ''}`} title={bookTitle(book)} className="mx-auto max-h-96 max-w-full rounded-lg shadow" />}
         <h2 className="m-0 text-xl font-bold text-plum [overflow-wrap:anywhere]">{book.title || 'Titolo sconosciuto'}</h2>
         <span className="self-start"><Badge read={book.read} /></span>
         <Button disabled={busy} onClick={() => void patch({ read: !book.read }, '')} aria-pressed={!!book.read}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>

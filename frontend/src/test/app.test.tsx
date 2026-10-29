@@ -81,6 +81,31 @@ describe('app', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('la copertina nella scheda si ingrandisce e si chiude con X, Esc e tocco fuori', async () => {
+    server();
+    open('/libro/9780306406157');
+    const cover = await screen.findByRole('button', { name: 'Ingrandisci la copertina' });
+    await userEvent.click(cover);
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('img', { name: 'Copertina di Mansfield Park' })).toHaveAttribute('src', '/covers/a.jpg');
+    await userEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(cover).toHaveFocus();
+    await userEvent.click(cover);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(cover);
+    await userEvent.click(screen.getByRole('dialog'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('senza copertina la scheda non ha il pulsante di ingrandimento', async () => {
+    server({ 'GET /api/books': [{ isbn: '9780306406188', title: 'Senza', authors: [], genres: ['Narrativa'] }] });
+    open('/libro/9780306406188');
+    await screen.findByRole('heading', { name: 'Senza' });
+    expect(screen.queryByRole('button', { name: 'Ingrandisci la copertina' })).toBeNull();
+  });
+
   it('la barra in basso ha tre voci e segna quella corrente', async () => {
     server();
     open('/libreria');
