@@ -102,7 +102,7 @@ describe('app', () => {
   it('senza copertina la scheda non ha il pulsante di ingrandimento', async () => {
     server({ 'GET /api/books': [{ isbn: '9780306406188', title: 'Senza', authors: [], genres: ['Narrativa'] }] });
     open('/libro/9780306406188');
-    await screen.findByRole('heading', { name: 'Senza' });
+    await screen.findByRole('heading', { level: 2, name: 'Senza' });
     expect(screen.queryByRole('button', { name: 'Ingrandisci la copertina' })).toBeNull();
   });
 
