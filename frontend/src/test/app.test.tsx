@@ -253,4 +253,56 @@ describe('app', () => {
     expect((sent[0] as { genres: string[] }).genres).toEqual(['Fantasy', 'Romantasy']);
     expect(calls.filter((c) => c.startsWith('PATCH')).length).toBe(1);
   });
+  // jsdom non calcola il layout: il controllo guarda la pila di sovrapposizione. Un elemento con z-index
+  // nel contenuto di una schermata deve stare dentro un contesto isolato (isolate), altrimenti può
+  // finire sopra la barra fissa dei filtri (z-10) e delle intestazioni quando si scorre.
+  function sfuggeAllaPila(root: HTMLElement) {
+    const z = /(^|\s)-?z-(\d+)(\s|$)/;
+    return [...root.querySelectorAll('[class]')].filter((el) => {
+      const c = el.getAttribute('class') || '';
+      if (!z.test(c) || el.closest('[data-sticky-bar]') === el) return false;
+      if (/(^|\s)fixed(\s|$)/.test(c) || el.closest('header,nav,[role="dialog"]')) return false;
+      for (let p = el.parentElement; p && p !== root; p = p.parentElement) {
+        if (/(^|\s)isolate(\s|$)/.test(p.getAttribute('class') || '')) return false;
+      }
+      return true;
+    });
+  }
+
+  it.each([360, 390])('a %i px il badge non finisce sopra la barra dei filtri, con e senza filtri, anche toccando di continuo', async (w) => {
+    window.innerWidth = w;
+    server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Sapiens', authors: ['Harari'], genres: ['Saggio'], cover: 'c.jpg' }] });
+    const { container } = open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const barra = screen.getByRole('group', { name: 'Stato' }).parentElement as HTMLElement;
+    const zBarra = Number(/(^|\s)z-(\d+)/.exec(barra.className)?.[2]);
+    expect(barra.className).toContain('sticky');
+    expect(screen.getAllByText('Da leggere').length).toBeGreaterThan(0);
+    expect(sfuggeAllaPila(container)).toEqual([]);
+    for (const el of container.querySelectorAll('ul [class]')) {
+      const m = /(^|\s)z-(\d+)/.exec(el.getAttribute('class') || '');
+      if (m) expect(Number(m[2])).toBeLessThanOrEqual(zBarra);
+    }
+    for (let i = 0; i < 3; i++) {
+      await userEvent.click(screen.getByRole('button', { name: /^Da leggere/ }));
+      expect(sfuggeAllaPila(container)).toEqual([]);
+      await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
+      expect(sfuggeAllaPila(container)).toEqual([]);
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^Tutti/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Saggio/ }));
+    expect(screen.getByTestId('active-filters')).toBeInTheDocument();
+    expect(sfuggeAllaPila(container)).toEqual([]);
+  });
+
+  it('Scansiona e Note non hanno elementi con z-index fuori da un contesto isolato', async () => {
+    server();
+    for (const path of ['/scansiona', '/note']) {
+      const r = open(path);
+      await waitFor(() => expect(screen.getAllByTestId('ornament').length).toBeGreaterThan(0));
+      expect(sfuggeAllaPila(r.container)).toEqual([]);
+      r.unmount();
+    }
+  });
 });

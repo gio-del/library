@@ -41,7 +41,7 @@ export function Library() {
 
   return (
     <section>
-      <div className="sticky top-[calc(3.75rem+3px+env(safe-area-inset-top))] z-10 -mx-4 bg-cream px-4 pb-2 pt-1">
+      <div data-sticky-bar className="sticky top-[calc(3.75rem+3px+env(safe-area-inset-top))] z-10 -mx-4 bg-cream px-4 pb-2 pt-1">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
@@ -70,7 +70,7 @@ export function Library() {
       <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 pt-2 sm:grid-cols-3">
         {shown.map((b) => (
           <li key={b.isbn}>
-            <Link to={`/libro/${b.isbn}`} className="relative flex h-full flex-col gap-1.5 rounded-xl bg-paper p-2 shadow-sm">
+            <Link to={`/libro/${b.isbn}`} className="relative isolate flex h-full flex-col gap-1.5 rounded-xl bg-paper p-2 shadow-sm">
               <Badge read={b.read} className="absolute left-3.5 top-3.5 z-10 shadow" />
               <Cover book={b}>{bookTitle(b)}</Cover>
               <span className="line-clamp-2 text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{bookTitle(b)}</span>
