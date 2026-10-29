@@ -1,3 +1,5 @@
+import type { CoverRead } from './coverRead';
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -25,6 +27,12 @@ export async function putCover<T>(isbn: string, blob: Blob): Promise<T> {
   const url = `/api/books/${isbn}/cover`;
   const res = await fetch(url, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: blob });
   return (await parse(res, url)) as T;
+}
+
+export async function readCover(blob: Blob): Promise<CoverRead> {
+  const url = '/api/cover-read';
+  const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: blob });
+  return (await parse(res, url)) as CoverRead;
 }
 
 // Scala e ricodifica in JPEG: il server accetta solo JPEG.

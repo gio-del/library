@@ -10,6 +10,7 @@ const { createNotes, MAX_TEXT } = require('./lib/notes');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
 const { classify, MAX_GENRES } = require('./lib/genres');
+const { createCoverReader } = require('./lib/coverread');
 const { cleanFields, toCsv, parseImport } = require('./lib/exporter');
 
 const MAX_BODY = 4096;
@@ -39,6 +40,8 @@ function readConfig(env) {
     dataDir: path.resolve(env.DATA_DIR || './data'),
     user: env.AUTH_USER || 'library',
     password,
+    claudeBin: env.CLAUDE_BIN || '',
+    claudeTimeoutMs: Number(env.CLAUDE_TIMEOUT_MS) || undefined,
   };
 }
 
@@ -47,6 +50,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
   const notes = createNotes(config.dataDir);
   const auth = createAuth({ user: config.user, password: config.password, now });
   const coversDir = path.join(config.dataDir, 'covers');
+  const coverReader = config.claudeBin ? createCoverReader({ bin: config.claudeBin, timeoutMs: config.claudeTimeoutMs }) : null;
   const publicDir = path.join(__dirname, 'public');
 
   function send(res, status, body, extra = {}) {
@@ -196,7 +200,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
 
   async function api(req, res, url) {
     const p = url.pathname;
-    if (req.method === 'GET' && p === '/api/auth/status') return send(res, 200, { authenticated: auth.valid(token(req)) });
+    if (req.method === 'GET' && p === '/api/auth/status') return send(res, 200, { authenticated: auth.valid(token(req)), coverRead: Boolean(coverReader) });
     if (req.method === 'POST' && p === '/api/login') {
       const b = await readJson(req);
       const r = auth.login(String(b.user ?? config.user), String(b.password ?? ''));
@@ -297,6 +301,12 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const old = await store.get(pt[1]);
       const book = old && (await store.replace({ ...old, ...patch }));
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
+    }
+    if (req.method === 'POST' && p === '/api/cover-read') {
+      if (!coverReader) return send(res, 404, { error: 'Lettura non disponibile' });
+      const img = await readRaw(req, MAX_COVER_UPLOAD);
+      if (img.length < 4 || img[0] !== 0xff || img[1] !== 0xd8 || img[2] !== 0xff) return send(res, 400, { error: 'Immagine non valida (serve un JPEG)' });
+      try { return send(res, 200, await coverReader.read(img)); } catch (e) { return send(res, e.status || 502, { error: e.status ? e.message : 'Non riesco a leggere la copertina' }); }
     }
     const cv = keyRe('\\/api\\/books\\/', '\\/cover').exec(p);
     if (req.method === 'PUT' && cv) {

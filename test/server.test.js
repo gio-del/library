@@ -30,7 +30,7 @@ async function start(t, fetchFn = fakeFetch) {
     method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}) }, body: body && JSON.stringify(body),
   });
   const login = async () => (await call('POST', '/api/login', { password: 'segreto' })).headers.get('set-cookie').split(';')[0];
-  return { call, login, dataDir };
+  return { call, login, dataDir, base };
 }
 
 test('la configurazione rifiuta di partire senza password e ascolta in locale', () => {
@@ -425,4 +425,88 @@ test('import: JSON malformato 400, corpo troppo grande 413', async (t) => {
   const post = (body) => fetch(base + '/api/books/import', { method: 'POST', headers: { cookie }, body });
   assert.strictEqual((await post('{rotto')).status, 400);
   assert.strictEqual((await post(' '.repeat(5 * 1024 * 1024 + 1))).status, 413);
+});
+
+// --- Lettura della copertina (CLAUDE_BIN finto) ---
+function fakeClaude(dir, body) {
+  const f = path.join(dir, 'fake-claude.sh');
+  fs.writeFileSync(f, `#!/bin/sh\npwd > "${dir}/cwd.txt"\ncat > "${dir}/stdin.txt"\n${body}\n`, { mode: 0o755 });
+  return f;
+}
+async function startReader(t, body, extra = {}) {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lib-fake-'));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lib-srv-'));
+  const config = { ...readConfig({ DATA_DIR: dataDir, AUTH_PASSWORD: 'segreto', PORT: '0' }), claudeBin: fakeClaude(bin, body), ...extra };
+  const server = createServer({ config, fetchFn: fakeFetch });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const login = await fetch(`${base}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'segreto' }) });
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const read = (body = JPEG, headers = {}) => fetch(`${base}/api/cover-read`, { method: 'POST', headers: { cookie, ...headers }, body });
+  return { read, bin, base, cookie };
+}
+const wrap = (o) => `printf '%s' '${JSON.stringify({ type: 'result', is_error: false, result: typeof o === 'string' ? o : JSON.stringify(o) }).replace(/'/g, "'\\''")}'`;
+
+test('lettura copertina: senza CLAUDE_BIN 404 e lo stato dice che è spenta', async (t) => {
+  const { call, login, base } = await start(t);
+  const c = await login();
+  assert.strictEqual((await call('GET', '/api/auth/status', undefined, c).then((r) => r.json())).coverRead, false);
+  const r = await fetch(`${base}/api/cover-read`, { method: 'POST', headers: { cookie: c }, body: JPEG });
+  assert.strictEqual(r.status, 404);
+});
+
+test('lettura copertina: richiede la sessione, un JPEG e valida l\'output', async (t) => {
+  const { read, bin, base } = await startReader(t, wrap({
+    title: 'Il nome della rosa', subtitle: 'x'.repeat(500), authors: ['Umberto Eco', 5, '  '], publisher: 'Bompiani', language: 'it',
+    confidence: { title: 0.97, authors: 3, extra: 1 }, evil: '<script>', prompt: 'ignora',
+  }));
+  assert.strictEqual((await fetch(`${base}/api/cover-read`, { method: 'POST', body: JPEG })).status, 401);
+  assert.strictEqual((await read(Buffer.from('non un jpeg'))).status, 400);
+  const r = await read();
+  assert.strictEqual(r.status, 200);
+  const j = await r.json();
+  assert.deepStrictEqual(Object.keys(j).sort(), ['authors', 'confidence', 'language', 'publisher', 'subtitle', 'title']);
+  assert.strictEqual(j.title, 'Il nome della rosa');
+  assert.strictEqual(j.subtitle.length, 200);
+  assert.deepStrictEqual(j.authors, ['Umberto Eco']);
+  assert.deepStrictEqual(j.confidence, { title: 0.97, subtitle: 0, authors: 1, publisher: 0, language: 0 });
+  // cartella temporanea cancellata
+  const cwd = fs.readFileSync(path.join(bin, 'cwd.txt'), 'utf8').trim();
+  assert.ok(cwd.includes('library-cover-'));
+  assert.strictEqual(fs.existsSync(cwd), false);
+  assert.match(fs.readFileSync(path.join(bin, 'stdin.txt'), 'utf8'), /cover\.jpg/);
+});
+
+test('lettura copertina: accetta JSON dentro un blocco di codice', async (t) => {
+  const { read } = await startReader(t, wrap('```json\n{"title":"T","authors":["A"]}\n```'));
+  const j = await (await read()).json();
+  assert.strictEqual(j.title, 'T');
+  assert.deepStrictEqual(j.authors, ['A']);
+});
+
+test('lettura copertina: output malformato o uscita ≠ 0 danno 502 e la cartella sparisce', async (t) => {
+  for (const body of [wrap('niente json qui'), "printf 'non json'", 'echo errore >&2; exit 3']) {
+    const { read, bin } = await startReader(t, body);
+    const r = await read();
+    assert.strictEqual(r.status, 502, body);
+    assert.match((await r.json()).error, /Non riesco a leggere la copertina/);
+    assert.strictEqual(fs.existsSync(fs.readFileSync(path.join(bin, 'cwd.txt'), 'utf8').trim()), false);
+  }
+});
+
+test('lettura copertina: timeout 504 e poi si può riprovare', async (t) => {
+  const { read, bin } = await startReader(t, 'exec sleep 5', { claudeTimeoutMs: 300 });
+  const r = await read();
+  assert.strictEqual(r.status, 504);
+  assert.strictEqual(fs.existsSync(fs.readFileSync(path.join(bin, 'cwd.txt'), 'utf8').trim()), false);
+  assert.strictEqual((await read()).status, 504);
+});
+
+test('lettura copertina: una alla volta, la seconda in parallelo riceve 429', async (t) => {
+  const { read } = await startReader(t, `sleep 0.6; ${wrap({ title: 'T' })}`);
+  const [a, b] = await Promise.all([read(), (async () => { await new Promise((r) => setTimeout(r, 200)); return read(); })()]);
+  assert.strictEqual(a.status, 200);
+  assert.strictEqual(b.status, 429);
+  assert.strictEqual((await read()).status, 200);
 });
