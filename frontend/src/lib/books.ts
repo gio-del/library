@@ -45,3 +45,36 @@ export function sortBooks(books: Book[], order: SortOrder): Book[] {
     return x.localeCompare(y, 'it');
   });
 }
+
+export interface LibraryStats {
+  total: number;
+  read: number;
+  toRead: number;
+  genres: [string, number][];
+  months: { key: string; label: string; count: number }[];
+}
+
+export const STATS_GENRES = 8;
+export const STATS_MONTHS = 6;
+
+// Stessi conteggi della Libreria (matchRead, genreCounts); i mesi sono gli ultimi 6 fino a `now`, in ora locale.
+export function libraryStats(books: Book[], now: Date): LibraryStats {
+  const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const months = Array.from({ length: STATS_MONTHS }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (STATS_MONTHS - 1 - i), 1);
+    return { key: key(d), label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), count: 0 };
+  });
+  for (const b of books) {
+    const d = b.added ? new Date(b.added) : null;
+    if (!d || Number.isNaN(d.getTime())) continue;
+    const m = months.find((x) => x.key === key(d));
+    if (m) m.count++;
+  }
+  return {
+    total: books.length,
+    read: books.filter((b) => matchRead(b, 'read')).length,
+    toRead: books.filter((b) => matchRead(b, 'toread')).length,
+    genres: genreCounts(books, 'all', '').slice(0, STATS_GENRES),
+    months,
+  };
+}

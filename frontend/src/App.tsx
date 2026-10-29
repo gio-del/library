@@ -9,6 +9,7 @@ import { BookDetail } from './screens/BookDetail';
 import { Scan } from './screens/Scan';
 import { ManualForm } from './screens/ManualForm';
 import { Notes } from './screens/Notes';
+import { Stats } from './screens/Stats';
 
 export function App() {
   const { status } = useAuth();
@@ -24,6 +25,7 @@ export function App() {
             <Route path="/note" element={<Notes />} />
           </Route>
           <Route path="/scansiona/manuale" element={<ManualForm />} />
+          <Route path="/statistiche" element={<Stats />} />
           <Route path="/libro/:isbn" element={<BookDetail />} />
           <Route path="*" element={<Navigate to="/libreria" replace />} />
         </Routes>

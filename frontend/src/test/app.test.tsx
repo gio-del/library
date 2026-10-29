@@ -228,6 +228,26 @@ describe('app', () => {
     expect(calls.filter((c) => c === 'POST /api/books/import').length).toBe(1);
   });
 
+  it('Gestione apre le Statistiche, con i numeri della Libreria e il ritorno', async () => {
+    server();
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Altro' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Statistiche/ }));
+    expect(await screen.findByRole('heading', { name: 'Statistiche' })).toBeInTheDocument();
+    expect(screen.getByText('2', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Libri letti' })).toHaveAttribute('aria-valuetext', '1 letti su 2 (50%)');
+    expect(screen.getByRole('img', { name: 'Narrativa: 2 su 2' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+    expect(await screen.findByText('Mansfield Park')).toBeInTheDocument();
+  });
+
+  it('Statistiche con libreria vuota mostra un messaggio', async () => {
+    server({ 'GET /api/books': [] });
+    open('/statistiche');
+    expect(await screen.findByText(/La libreria è vuota/)).toBeInTheDocument();
+  });
+
   it('Gestione: un file che non è JSON dà un errore e non chiama il server', async () => {
     const calls = server();
     open('/libreria');
