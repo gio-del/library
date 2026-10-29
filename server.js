@@ -9,6 +9,7 @@ const { createStore } = require('./lib/store');
 const { createNotes, MAX_TEXT } = require('./lib/notes');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
+const { searchBooks } = require('./lib/search');
 const { classify, MAX_GENRES } = require('./lib/genres');
 const { createCoverReader } = require('./lib/coverread');
 const { cleanFields, toCsv, parseImport } = require('./lib/exporter');
@@ -265,6 +266,12 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const book = await retryBook(lk[1]);
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
       }
+    if (req.method === 'GET' && p === '/api/search') {
+      const title = (url.searchParams.get('title') || '').trim().slice(0, 200);
+      const author = (url.searchParams.get('author') || '').trim().slice(0, 200);
+      if (!title) return send(res, 400, { error: 'Il titolo è obbligatorio' });
+      try { return send(res, 200, { candidates: await searchBooks(title, author, fetchFn) }); } catch { return send(res, 200, { candidates: [] }); }
+    }
     const one = /^\/api\/(books|lookup)\/([^/]{1,40})$/.exec(p);
     if (req.method === 'GET' && one) {
       let raw = one[2];
@@ -278,7 +285,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       // Anteprima dalle fonti per un libro non in libreria: nessuna scrittura, mai un errore.
       try {
         const found = await lookup(isbn, fetchFn);
-        return send(res, 200, found ? { isbn, title: found.title, authors: found.authors } : { isbn, title: '', authors: [] });
+        return send(res, 200, found ? { isbn, title: found.title, authors: found.authors, genres: classify(found.subjects, { dewey: found.dewey, title: found.title }) } : { isbn, title: '', authors: [] });
       } catch { return send(res, 200, { isbn, title: '', authors: [] }); }
     }
     const pt = keyRe('\\/api\\/books\\/').exec(p);

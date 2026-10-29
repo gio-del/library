@@ -10,7 +10,7 @@ export interface CoverRead {
 export const READ_LABELS: Record<string, string> = { title: 'Titolo', authors: 'Autori', publisher: 'Editore', language: 'Lingua' };
 
 // Riempie solo i campi vuoti del modulo; ritorna le chiavi compilate.
-export function fillEmpty(form: Record<string, string>, read: CoverRead): { form: Record<string, string>; filled: string[] } {
+export function fillFromRead(form: Record<string, string>, read: CoverRead): { form: Record<string, string>; filled: string[] } {
   const found: Record<string, string> = { title: read.title, authors: read.authors.join(', '), publisher: read.publisher, language: read.language };
   const next = { ...form };
   const filled: string[] = [];

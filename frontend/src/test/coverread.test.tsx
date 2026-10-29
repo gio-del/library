@@ -24,7 +24,18 @@ function server(opts: { coverRead?: boolean; read?: () => Promise<Response> } = 
 }
 
 const open = (path: string) => render(<MemoryRouter initialEntries={[path]}><AuthProvider><App /></AuthProvider></MemoryRouter>);
-const pick = async (container: HTMLElement) => userEvent.upload(container.querySelector('input[type=file]') as HTMLInputElement, new File([new Uint8Array([0xff, 0xd8, 0xff])], 'c.jpg', { type: 'image/jpeg' }));
+const pick = async (container: HTMLElement) => {
+  await userEvent.upload(container.querySelector('input[type=file]') as HTMLInputElement, new File([new Uint8Array([0xff, 0xd8, 0xff])], 'c.jpg', { type: 'image/jpeg' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Usa la foto' }));
+};
+
+beforeEach(() => {
+  globalThis.createImageBitmap = vi.fn(async () => ({ width: 400, height: 600 })) as never;
+  URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn();
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ drawImage: vi.fn(), translate: vi.fn(), rotate: vi.fn() })) as never;
+  HTMLCanvasElement.prototype.toBlob = vi.fn((cb: BlobCallback) => cb(new Blob(['x'], { type: 'image/jpeg' }))) as never;
+  Element.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, left: 0, top: 0, width: 200, height: 300, right: 200, bottom: 300, toJSON() {} });
+});
 
 afterEach(() => vi.unstubAllGlobals());
 

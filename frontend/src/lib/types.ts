@@ -18,3 +18,14 @@ export interface Book {
 }
 
 export interface NotesVersion { text: string; updated?: string }
+
+export interface Candidate {
+  isbn: string;
+  title: string;
+  authors: string[];
+  publisher: string;
+  year: string;
+  pages: string;
+  language: string;
+  source: string;
+}

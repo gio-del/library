@@ -4,22 +4,24 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
 import { GENRES, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry } from '../lib/books';
 import { isbn10Of } from '../lib/isbn';
-import type { Book } from '../lib/types';
+import type { Book, Candidate } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
 import { useAuth } from '../state/auth';
-import { fillEmpty, READ_LABELS, type CoverRead } from '../lib/coverRead';
+import { fillFromRead, READ_LABELS, type CoverRead } from '../lib/coverRead';
 import { ReadPhotoButton } from '../components/ReadPhotoButton';
 import { CoverPicker } from '../components/CoverPicker';
 import { CoverViewer } from '../components/CoverViewer';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
 import { useToast } from '../components/Toast';
+import { OnlineSearch, fillEmpty } from '../components/OnlineSearch';
 import { Badge, Button, Field, Input, Msg, Textarea } from '../components/ui';
 
 const SOURCES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'SBN', amazon: 'Amazon' };
 const EDIT = ['title', 'edition', 'publisher', 'year', 'series', 'pages', 'language', 'notes'] as const;
 const LABELS: Record<(typeof EDIT)[number], string> = { title: 'Titolo', edition: 'Edizione', publisher: 'Editore', year: 'Anno', series: 'Collana', pages: 'Pagine', language: 'Lingua', notes: 'Note' };
+const lab = (cat: string[], k: string, label: string) => (cat.includes(k) ? `${label} · da catalogo` : label);
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 function rows(b: Book): [string, string][] {
@@ -45,6 +47,7 @@ export function BookDetail() {
   const [picked, setPicked] = useState<string[]>([]);
   const [formErr, setFormErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cat, setCat] = useState<string[]>([]);
   const [coverV, setCoverV] = useState(0);
   const [askDelete, setAskDelete] = useState(false);
   const lock = useLock();
@@ -74,6 +77,7 @@ export function BookDetail() {
     setForm(f);
     setFormErr('');
     setFromPhoto([]);
+    setCat([]);
     setEditing(true);
   }
 
@@ -84,6 +88,20 @@ export function BookDetail() {
     if (picked.join('|') !== bookGenres(book!).filter((g) => g !== UNCLASSIFIED).join('|')) body.genres = picked;
     for (const k of EDIT) body[k] = form[k];
     if (await patch(body, 'Salvato')) setEditing(false);
+  }
+
+  async function fromCatalog(c: Candidate) {
+    const r = fillEmpty(form, c, ['authors', 'publisher', 'year', 'pages', 'language']);
+    setForm(r.form);
+    const filled = [...r.filled];
+    if (c.isbn && !picked.length) {
+      try {
+        const g = (await api<{ genres?: string[] }>('GET', `/api/lookup/${c.isbn}`)).genres;
+        const ok = (g || []).filter((x) => x !== UNCLASSIFIED).slice(0, MAX_GENRES);
+        if (ok.length) { setPicked(ok); filled.push('genres'); }
+      } catch { /* i generi restano vuoti */ }
+    }
+    setCat((x) => [...new Set([...x, ...filled])]);
   }
 
   async function changeCover(file: Blob) {
@@ -115,7 +133,7 @@ export function BookDetail() {
   }
 
   function applyRead(r: CoverRead): string {
-    const { form: next, filled } = fillEmpty(form, r);
+    const { form: next, filled } = fillFromRead(form, r);
     setForm(next);
     setFromPhoto([...new Set([...fromPhoto, ...filled])]);
     return filled.length ? `Compilati dalla foto: ${filled.map((k) => READ_LABELS[k].toLowerCase()).join(', ')}. Controlla e premi «Salva».` : 'Niente da compilare: i campi sono già pieni o la foto non dice altro.';
@@ -132,9 +150,10 @@ export function BookDetail() {
       <SubPage title="Modifica" fallback="/libreria">
         <form onSubmit={(e) => void save(e)}>
           <Field label={`Titolo${mark('title')}`} error={formErr}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-          <Field label={`Autori (separati da virgola)${mark('authors')}`}><Input value={form.authors} onChange={(e) => setForm({ ...form, authors: e.target.value })} /></Field>
+          <Field label={`${lab(cat, 'authors', 'Autori (separati da virgola)')}${mark('authors')}`}><Input value={form.authors} onChange={(e) => { setForm({ ...form, authors: e.target.value }); setCat(cat.filter((x) => x !== 'authors')); setFromPhoto(fromPhoto.filter((x) => x !== 'authors')); }} /></Field>
+          <OnlineSearch className="my-2 w-full" title={form.title} author={form.authors} onPick={(c) => void fromCatalog(c)} />
           <fieldset className="mt-4 min-w-0 border-0 p-0">
-            <legend className="mb-1 text-sm font-medium text-muted">Generi (fino a {MAX_GENRES})</legend>
+            <legend className="mb-1 text-sm font-medium text-muted">{lab(cat, 'genres', `Generi (fino a ${MAX_GENRES})`)}</legend>
             <div className="flex flex-wrap gap-2">
               {[...GENRES, ...picked.filter((g) => !GENRES.includes(g))].map((g) => {
                 const on = picked.includes(g);
@@ -148,7 +167,7 @@ export function BookDetail() {
             </div>
           </fieldset>
           {EDIT.filter((k) => k !== 'title' && k !== 'notes').map((k) => (
-            <Field key={k} label={`${LABELS[k]}${mark(k)}`}><Input value={form[k]} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></Field>
+            <Field key={k} label={`${lab(cat, k, LABELS[k])}${mark(k)}`}><Input value={form[k]} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => { setForm({ ...form, [k]: e.target.value }); setCat(cat.filter((x) => x !== k)); setFromPhoto(fromPhoto.filter((x) => x !== k)); }} /></Field>
           ))}
           <Field label="Note"><Textarea rows={3} maxLength={1000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
           {coverRead && book.cover && <div className="mt-4"><ReadPhotoButton getPhoto={photo} onRead={applyRead} disabled={busy} /></div>}
