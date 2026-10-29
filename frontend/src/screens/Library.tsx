@@ -1,7 +1,7 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { bookGenres, bookTitle, genreCounts, matchRead, type ReadFilter } from '../lib/books';
+import { bookGenres, bookTitle, genreCounts, matchRead, norm, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -9,30 +9,31 @@ import { Badge, Cover, Input, Msg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
-const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z']];
 const matchText = (b: Book, q: string) => !q || norm([b.title, ...b.authors].filter(Boolean).join(' ')).includes(q);
 
 export function Library() {
   const { books, loaded, load } = useBooks();
   const [state, setState] = useState<ReadFilter>('all');
   const [genre, setGenre] = useState('');
+  const [order, setOrder] = useState<SortOrder>('recent');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
   const { key } = useLocation();
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
-  useEffect(() => { setState('all'); setGenre(''); setQuery(''); }, [key]);
+  useEffect(() => { setState('all'); setGenre(''); setQuery(''); setOrder('recent'); }, [key]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
 
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchText(b, q)), [books, q]);
-  const shown = searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)));
+  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre))), order), [searched, state, genre, order]);
   const genres = genreCounts(searched, state, genre);
   const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
-  const active = state !== 'all' || genre !== '' || q !== '';
+  const active = state !== 'all' || genre !== '' || q !== '' || order !== 'recent';
 
   let status = '';
   if (err) status = err;
@@ -81,12 +82,18 @@ export function Library() {
       </ul>
 
       <Sheet open={open} onOpenChange={setOpen} title="Filtri">
+        <p className="mb-2 text-sm font-medium text-muted">Ordina per</p>
+        <div role="group" aria-label="Ordina per" className="mb-4 flex flex-col gap-2">
+          {ORDERS.map(([o, label]) => (
+            <button key={o} type="button" aria-pressed={order === o} onClick={() => setOrder(o)} className={cn('flex min-h-12 items-center rounded-xl px-4 text-left font-medium', order === o ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{label}</button>
+          ))}
+        </div>
         <p className="mb-2 text-sm font-medium text-muted">Genere</p>
         <div role="group" aria-label="Genere" className="flex flex-col gap-2">
           <GenreRow label="Tutti i generi" count={count(state)} on={genre === ''} onPick={() => { setGenre(''); setOpen(false); }} />
           {genres.map(([g, c]) => <GenreRow key={g} label={g} count={c} on={genre === g} onPick={() => { setGenre(g); setOpen(false); }} />)}
         </div>
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setQuery(''); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setQuery(''); setOrder('recent'); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );

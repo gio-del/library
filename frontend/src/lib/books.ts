@@ -28,3 +28,20 @@ export function genreCounts(books: Book[], f: ReadFilter, selected: string): [st
 export function filterBooks(books: Book[], f: ReadFilter, genre: string): Book[] {
   return books.filter((b) => matchRead(b, f) && (!genre || bookGenres(b).includes(genre)));
 }
+
+export type SortOrder = 'recent' | 'title' | 'author';
+export const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+// Solo per la lista: i libri senza il valore da confrontare vanno in fondo, a parità resta l'ordine di arrivo.
+export function sortBooks(books: Book[], order: SortOrder): Book[] {
+  const text = (b: Book) => norm((order === 'title' ? b.title : b.authors.find(Boolean)) || '').trim();
+  return [...books].sort((a, b) => {
+    if (order === 'recent') {
+      if (!a.added || !b.added) return a.added ? -1 : b.added ? 1 : 0;
+      return a.added < b.added ? 1 : a.added > b.added ? -1 : 0;
+    }
+    const x = text(a), y = text(b);
+    if (!x || !y) return x ? -1 : y ? 1 : 0;
+    return x.localeCompare(y, 'it');
+  });
+}

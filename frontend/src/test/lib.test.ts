@@ -1,4 +1,4 @@
-import { bookGenres, filterBooks, genreCounts, needsRetry } from '../lib/books';
+import { bookGenres, filterBooks, genreCounts, needsRetry, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -36,5 +36,18 @@ describe('books', () => {
     expect(needsRetry(b({ cover: null }))).toBe(true);
     expect(needsRetry(b({ cover: 'x.jpg' }))).toBe(false);
     expect(needsRetry(b({ isbn: 'm0123456789ab' }))).toBe(false);
+  });
+});
+
+describe('sortBooks', () => {
+  const ids = (l: Book[]) => l.map((x) => x.isbn);
+  it('recenti: added decrescente, senza added in fondo', () => {
+    const l = [b({ isbn: 'a' }), b({ isbn: 'b', added: '2026-01-01' }), b({ isbn: 'c', added: '2026-03-01' })];
+    expect(ids(sortBooks(l, 'recent'))).toEqual(['c', 'b', 'a']);
+  });
+  it('titolo e autore ignorano accenti e maiuscole, i mancanti vanno in fondo', () => {
+    const l = [b({ isbn: 'a', title: 'zeta', authors: ['Zed'] }), b({ isbn: 'n' }), b({ isbn: 'e', title: 'Èco', authors: ['Eco'] }), b({ isbn: 'd', title: 'dune', authors: ['Álvaro'] })];
+    expect(ids(sortBooks(l, 'title'))).toEqual(['d', 'e', 'a', 'n']);
+    expect(ids(sortBooks(l, 'author'))).toEqual(['d', 'e', 'a', 'n']);
   });
 });
