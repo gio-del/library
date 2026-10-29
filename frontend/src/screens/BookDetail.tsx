@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
-import { GENRES, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry } from '../lib/books';
+import { GENRES, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry, ratingOf, todayIso } from '../lib/books';
 import { isbn10Of } from '../lib/isbn';
 import type { Book, Candidate } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -11,6 +11,7 @@ import { useAuth } from '../state/auth';
 import { fillFromRead, READ_LABELS, type CoverRead } from '../lib/coverRead';
 import { ReadPhotoButton } from '../components/ReadPhotoButton';
 import { CoverPicker } from '../components/CoverPicker';
+import { Stars } from '../components/Stars';
 import { CoverViewer } from '../components/CoverViewer';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
@@ -187,7 +188,14 @@ export function BookDetail() {
         {book.cover && <CoverViewer src={`/covers/${book.cover}${coverV ? `?v=${coverV}` : ''}`} title={bookTitle(book)} className="mx-auto max-h-96 max-w-full rounded-lg shadow" />}
         <h2 className="m-0 text-xl font-bold text-plum [overflow-wrap:anywhere]">{book.title || 'Titolo sconosciuto'}</h2>
         <span className="self-start"><Badge read={book.read} /></span>
-        <Button disabled={busy} onClick={() => void patch({ read: !book.read }, '')} aria-pressed={!!book.read}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>
+        <Button disabled={busy} onClick={() => void patch(book.read ? { read: false } : { read: true, ...(book.readAt ? {} : { readAt: todayIso() }) }, '')} aria-pressed={!!book.read}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>
+        {book.read && (
+          <div className="flex flex-col gap-2 rounded-xl bg-paper p-4 shadow-sm">
+            <Stars value={ratingOf(book)} disabled={busy} onChange={(v) => void patch({ rating: v || null }, '')} />
+            <label className="text-sm font-medium text-plum" htmlFor="read-at">Finito di leggere il</label>
+            <Input id="read-at" type="date" max={todayIso()} disabled={busy} value={book.readAt || ''} onChange={(e) => void patch({ readAt: e.target.value || null }, '')} />
+          </div>
+        )}
         {needsRetry(book) && <Button variant="ghost" onClick={() => void again()}>Cerca di nuovo i dati</Button>}
         <CoverPicker onPick={(f) => void changeCover(f)} />
         <div className="flex gap-2">

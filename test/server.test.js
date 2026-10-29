@@ -224,6 +224,26 @@ test('letto / non letto: default da leggere, PATCH, persistenza, tocchi ripetuti
   assert.strictEqual((await (await call('PATCH', `/api/books/${isbn}`, { read: false }, sid)).json()).book.read, false);
 });
 
+test('voto e data di lettura: validati, salvati, azzerabili', async (t) => {
+  const { call, login } = await start(t);
+  const sid = await login();
+  const isbn = '9780306406157';
+  await call('POST', '/api/books', { isbn }, sid);
+  for (const bad of [{ rating: 0 }, { rating: 6 }, { rating: 2.5 }, { rating: '3' }, { readAt: '2026-02-30' }, { readAt: '29/10/2026' }, { readAt: 5 }]) {
+    assert.strictEqual((await call('PATCH', `/api/books/${isbn}`, bad, sid)).status, 400, JSON.stringify(bad));
+  }
+  const ok = await (await call('PATCH', `/api/books/${isbn}`, { read: true, rating: 4, readAt: '2026-10-29' }, sid)).json();
+  assert.deepStrictEqual([ok.book.rating, ok.book.readAt], [4, '2026-10-29']);
+  const again = await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json();
+  assert.deepStrictEqual([again.rating, again.readAt], [4, '2026-10-29']);
+  const cleared = await (await call('PATCH', `/api/books/${isbn}`, { rating: null }, sid)).json();
+  assert.ok(!('rating' in cleared.book));
+  assert.strictEqual(cleared.book.readAt, '2026-10-29');
+  const csv = await (await call('GET', '/api/books/export?format=csv', undefined, sid)).text();
+  assert.match(csv, /Voto,Data di lettura/);
+  assert.match(csv, /2026-10-29/);
+});
+
 test('scheda: modifica campi con PATCH e cambio copertina con PUT', async (t) => {
   const { call, login, dataDir } = await start(t);
   const sid = await login();

@@ -40,6 +40,16 @@ export function Stats() {
             <h2 id="st-gen" className={h}>Generi più frequenti</h2>
             <ul className="space-y-2">{s.genres.map(([g, n]) => <Bar key={g} label={g} count={n} max={s.genres[0][1]} total={s.total} />)}</ul>
           </section>
+          <section aria-labelledby="st-voto">
+            <h2 id="st-voto" className={h}>Voti</h2>
+            {s.avgRating === null ? <p className="text-sm text-muted">Nessun voto ancora.</p> : (
+              <p className="text-sm">Voto medio: <strong className="text-2xl text-plum">{s.avgRating.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</strong> su 5 · {s.rated} {s.rated === 1 ? 'libro votato' : 'libri votati'}</p>
+            )}
+          </section>
+          <section aria-labelledby="st-letti">
+            <h2 id="st-letti" className={h}>Letti negli ultimi 6 mesi</h2>
+            <ul className="space-y-2">{s.readMonths.map((m) => <Bar key={m.key} label={m.label} count={m.count} max={Math.max(...s.readMonths.map((x) => x.count))} />)}</ul>
+          </section>
           <section aria-labelledby="st-mesi">
             <h2 id="st-mesi" className={h}>Aggiunti negli ultimi 6 mesi</h2>
             <ul className="space-y-2">{s.months.map((m) => <Bar key={m.key} label={m.label} count={m.count} max={Math.max(...s.months.map((x) => x.count))} />)}</ul>

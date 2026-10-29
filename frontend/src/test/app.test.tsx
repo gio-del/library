@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import { AuthProvider } from '../state/auth';
 import type { Book } from '../lib/types';
+import { todayIso } from '../lib/books';
 
 const BOOKS: Book[] = [
   { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], genres: ['Narrativa'], cover: 'a.jpg' },
@@ -191,12 +192,14 @@ describe('app', () => {
     expect(titles()[0]).toContain('Àlbum');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     const group = await screen.findByRole('group', { name: 'Ordina per' });
-    expect(within(group).getAllByRole('button')).toHaveLength(3);
+    expect(within(group).getAllByRole('button')).toHaveLength(4);
     expect(within(group).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     expect(within(group).getByRole('button', { name: 'Titolo A→Z' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(within(group).getByRole('button', { name: 'Autore A→Z' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Voto' }));
+    expect(within(group).getByRole('button', { name: 'Voto' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Azzera tutto' }));
     expect(titles()[0]).toContain('Àlbum');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
@@ -264,6 +267,65 @@ describe('app', () => {
     await userEvent.dblClick(btn);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Segna come da leggere' })).toBeInTheDocument());
     expect(calls.filter((c) => c.startsWith('PATCH')).length).toBe(1);
+  });
+
+  it('scheda: il voto compare solo se letto, si cambia, si azzera; la data parte da oggi', async () => {
+    const calls: string[] = [];
+    const bodies: unknown[] = [];
+    const today = todayIso();
+    server();
+    const base = fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      if (i?.method === 'PATCH') {
+        calls.push(u);
+        const body = JSON.parse(String(i.body));
+        bodies.push(body);
+        return new Response(JSON.stringify({ book: { ...BOOKS[0], read: true, readAt: today, rating: body.rating ?? undefined } }), { status: 200 });
+      }
+      return base(u, i);
+    }));
+    open('/libro/9780306406157');
+    await userEvent.click(await screen.findByRole('button', { name: 'Segna come letto' }));
+    expect(bodies[0]).toEqual({ read: true, readAt: today });
+    const group = await screen.findByRole('group', { name: 'Voto' });
+    expect(within(group).getAllByRole('button', { name: /stell[ae] su 5/ })).toHaveLength(5);
+    expect(within(group).getByRole('button', { name: '1 stella su 5' }).querySelector('svg')).not.toBeNull();
+    expect(screen.getByLabelText('Finito di leggere il')).toHaveValue(today);
+    await userEvent.click(within(group).getByRole('button', { name: '4 stelle su 5' }));
+    await waitFor(() => expect(bodies[1]).toEqual({ rating: 4 }));
+  });
+
+  it('scheda: un libro non letto non mostra il voto', async () => {
+    server();
+    open('/libro/9780306406157');
+    await screen.findByRole('button', { name: 'Segna come letto' });
+    expect(screen.queryByRole('group', { name: 'Voto' })).toBeNull();
+    expect(screen.queryByLabelText('Finito di leggere il')).toBeNull();
+  });
+
+  it('scheda: toccare la stella del voto attuale lo azzera', async () => {
+    const bodies: unknown[] = [];
+    server({ 'GET /api/books': [{ ...BOOKS[1], rating: 3, readAt: '2026-10-01' }] });
+    const base = fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      if (i?.method === 'PATCH') { bodies.push(JSON.parse(String(i.body))); return new Response(JSON.stringify({ book: BOOKS[1] }), { status: 200 }); }
+      return base(u, i);
+    }));
+    open('/libro/9780306406164');
+    const group = await screen.findByRole('group', { name: 'Voto' });
+    const three = within(group).getByRole('button', { name: '3 stelle su 5' });
+    expect(three).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(three);
+    await waitFor(() => expect(bodies).toEqual([{ rating: null }]));
+  });
+
+  it('Statistiche: media dei voti e letti per mese', async () => {
+    const d = todayIso();
+    server({ 'GET /api/books': [{ ...BOOKS[1], rating: 4, readAt: d }, { ...BOOKS[0], read: true, rating: 5, readAt: d }] });
+    open('/statistiche');
+    expect(await screen.findByText('4,5')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Letti negli ultimi 6 mesi' })).toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: /: 2$/ }).length).toBeGreaterThan(0);
   });
 
   it('eliminare un libro passa da una conferma e torna all’elenco', async () => {

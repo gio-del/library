@@ -9,7 +9,7 @@ import { Badge, Cover, Input, Msg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
-const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z']];
+const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
 const matchText = (b: Book, q: string) => !q || norm([b.title, ...b.authors].filter(Boolean).join(' ')).includes(q);
 
 export function Library() {
