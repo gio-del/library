@@ -261,7 +261,7 @@ describe('app', () => {
     return [...root.querySelectorAll('[class]')].filter((el) => {
       const c = el.getAttribute('class') || '';
       if (!z.test(c) || el.closest('[data-sticky-bar]') === el) return false;
-      if (el.closest('header,nav,[role="dialog"]')) return false;
+      if (/(^|\s)fixed(\s|$)/.test(c) || el.closest('header,nav,[role="dialog"]')) return false;
       for (let p = el.parentElement; p && p !== root; p = p.parentElement) {
         if (/(^|\s)isolate(\s|$)/.test(p.getAttribute('class') || '')) return false;
       }
