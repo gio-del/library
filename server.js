@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { normalize } = require('./lib/isbn');
 const { createStore } = require('./lib/store');
 const { createNotes, MAX_TEXT } = require('./lib/notes');
+const { createGoal, isValid: validGoal } = require('./lib/goal');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
 const { searchBooks } = require('./lib/search');
@@ -49,6 +50,7 @@ function readConfig(env) {
 function createServer({ config, fetchFn = fetch, now = Date.now }) {
   const store = createStore(config.dataDir);
   const notes = createNotes(config.dataDir);
+  const goal = createGoal(config.dataDir);
   const auth = createAuth({ user: config.user, password: config.password, now });
   const coversDir = path.join(config.dataDir, 'covers');
   const coverReader = config.claudeBin ? createCoverReader({ bin: config.claudeBin, timeoutMs: config.claudeTimeoutMs }) : null;
@@ -219,6 +221,12 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const b = await readJson(req, 4 * MAX_TEXT);
       if (typeof b.text !== 'string' || b.text.length > MAX_TEXT || !Number.isInteger(b.rev)) return send(res, 400, { error: 'Note non valide' });
       return send(res, 200, await notes.put(b.text, b.rev, new Date(now()).toISOString()));
+    }
+    if (p === '/api/goal' && req.method === 'GET') return send(res, 200, await goal.get());
+    if (p === '/api/goal' && req.method === 'PUT') {
+      const b = await readJson(req);
+      if (!validGoal(b.goal)) return send(res, 400, { error: 'L’obiettivo è un numero intero da 1 a 999' });
+      return send(res, 200, await goal.put(b.goal));
     }
     if (req.method === 'GET' && p === '/api/books') {
       const q = (url.searchParams.get('q') || '').slice(0, 100);

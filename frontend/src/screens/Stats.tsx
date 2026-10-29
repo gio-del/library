@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { libraryStats } from '../lib/books';
 import { useBooks } from '../state/books';
 import { Msg } from '../components/ui';
+import { YearGoal, readInYear } from '../components/YearGoal';
 import { SubPage } from '../components/SubPage';
 
 function Bar({ label, count, max, total }: { label: string; count: number; max: number; total?: number }) {
@@ -20,13 +21,15 @@ function Bar({ label, count, max, total }: { label: string; count: number; max: 
 export function Stats() {
   const { books, loaded, load } = useBooks();
   useEffect(() => { if (!loaded) void load().catch(() => {}); }, [loaded, load]);
-  const s = libraryStats(books, new Date());
+  const now = new Date();
+  const s = libraryStats(books, now);
   const pct = s.total ? Math.round((s.read / s.total) * 100) : 0;
   const h = 'mb-2 text-sm font-semibold uppercase tracking-wide text-muted';
   return (
     <SubPage title="Statistiche" fallback="/libreria">
       {!loaded ? <Msg text="Carico…" /> : s.total === 0 ? <Msg text="La libreria è vuota: aggiungi qualche libro per vedere le statistiche." /> : (
         <div className="space-y-6">
+          <YearGoal year={now.getFullYear()} done={readInYear(books, now.getFullYear())} />
           <section aria-labelledby="st-tot">
             <h2 id="st-tot" className={h}>Libri</h2>
             <p className="text-3xl font-bold text-plum">{s.total} <span className="text-base font-medium text-ink">{s.total === 1 ? 'libro' : 'libri'}</span></p>
