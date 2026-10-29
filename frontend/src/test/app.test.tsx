@@ -178,6 +178,31 @@ describe('app', () => {
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
   });
 
+  it('il foglio Filtri ordina la lista per titolo e autore e si azzera', async () => {
+    window.innerWidth = 390;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg', added: '2026-01-01' },
+      { isbn: '9780306406164', title: 'Narnia', authors: ['C. S. Lewis'], cover: 'b.jpg', added: '2026-02-01' },
+      { isbn: '9780306406171', title: 'Àlbum', authors: ['Zola'], cover: 'c.jpg', added: '2026-03-01' },
+    ] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const titles = () => screen.getAllByRole('link', { name: /Mansfield|Narnia|Àlbum/ }).map((a) => a.textContent);
+    expect(titles()[0]).toContain('Àlbum');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const group = await screen.findByRole('group', { name: 'Ordina per' });
+    expect(within(group).getAllByRole('button')).toHaveLength(3);
+    expect(within(group).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
+    expect(within(group).getByRole('button', { name: 'Titolo A→Z' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(within(group).getByRole('button', { name: 'Autore A→Z' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Azzera tutto' }));
+    expect(titles()[0]).toContain('Àlbum');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    expect(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('Gestione chiede conferma e poi rilegge i generi', async () => {
     const calls = server({ 'POST /api/books/classify': { books: [{ ...BOOKS[0], genres: ['Classici'] }], changed: 1 } });
     open('/libreria');
