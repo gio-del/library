@@ -7,6 +7,8 @@ function mockCamera(gum: () => Promise<unknown>) {
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn(gum) } });
   HTMLMediaElement.prototype.play = vi.fn(async () => {});
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ drawImage: vi.fn() })) as never;
+  globalThis.createImageBitmap = vi.fn(async () => ({ width: 400, height: 600 })) as never;
+  URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn();
   HTMLCanvasElement.prototype.toBlob = vi.fn((cb: BlobCallback) => cb(new Blob(['x'], { type: 'image/jpeg' }))) as never;
 }
 
@@ -31,7 +33,8 @@ describe('Scatta ora', () => {
     expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledTimes(1);
     expect(t.stop).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Usa questa foto' }));
-    expect(onPick).toHaveBeenCalledTimes(1);
+    await userEvent.click(await screen.findByRole('button', { name: 'Usa la foto' }));
+    await waitFor(() => expect(onPick).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
