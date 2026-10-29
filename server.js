@@ -12,7 +12,7 @@ const { lookup, fetchCover } = require('./lib/lookup');
 const { searchBooks } = require('./lib/search');
 const { classify, MAX_GENRES } = require('./lib/genres');
 const { createCoverReader } = require('./lib/coverread');
-const { cleanFields, toCsv, parseImport } = require('./lib/exporter');
+const { cleanFields, cleanReading, toCsv, parseImport } = require('./lib/exporter');
 
 const MAX_BODY = 4096;
 const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
@@ -304,9 +304,14 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const f = cleanFields(b);
       if (f.error) return send(res, 400, { error: f.error });
       Object.assign(patch, f.fields);
-      if (!Object.keys(patch).length) return send(res, 400, { error: 'Stato non valido' });
+      const rd = cleanReading(b);
+      if (rd.error) return send(res, 400, { error: rd.error });
+      Object.assign(patch, rd.set);
+      if (!Object.keys(patch).length && !rd.unset.length) return send(res, 400, { error: 'Stato non valido' });
       const old = await store.get(pt[1]);
-      const book = old && (await store.replace({ ...old, ...patch }));
+      const next = old && { ...old, ...patch };
+      for (const k of rd.unset) if (next) delete next[k];
+      const book = next && (await store.replace(next));
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
     }
     if (req.method === 'POST' && p === '/api/cover-read') {

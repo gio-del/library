@@ -52,6 +52,23 @@ describe('sortBooks', () => {
   });
 });
 
+describe('voto', () => {
+  it('ordina dal più alto, senza voto in fondo (anche i non letti)', () => {
+    const l = [b({ isbn: 'n' }), b({ isbn: 'a', read: true, rating: 3 }), b({ isbn: 'z', read: true, rating: 5 }), b({ isbn: 'u', rating: 5 })];
+    expect(sortBooks(l, 'rating').map((x) => x.isbn)).toEqual(['z', 'a', 'n', 'u']);
+  });
+  it('statistiche: media dei voti e letti per mese di lettura', () => {
+    const s = libraryStats([
+      b({ read: true, rating: 4, readAt: '2026-10-03' }), b({ read: true, rating: 5, readAt: '2026-10-20' }),
+      b({ read: true, readAt: '2026-08-01' }), b({ rating: 1, readAt: '2026-10-01' }),
+    ], new Date(2026, 9, 29));
+    expect(s.avgRating).toBe(4.5);
+    expect(s.rated).toBe(2);
+    expect(s.readMonths.map((m) => m.count)).toEqual([0, 0, 0, 1, 0, 2]);
+    expect(libraryStats([b({})], new Date(2026, 9, 29)).avgRating).toBeNull();
+  });
+});
+
 describe('libraryStats', () => {
   const now = new Date(2026, 9, 29);
   const list = [

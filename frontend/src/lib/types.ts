@@ -12,6 +12,8 @@ export interface Book {
   genres?: string[];
   cover?: string | null;
   read?: boolean;
+  rating?: number;
+  readAt?: string;
   lookup?: string;
   source?: string;
   added?: string;

@@ -29,13 +29,21 @@ export function filterBooks(books: Book[], f: ReadFilter, genre: string): Book[]
   return books.filter((b) => matchRead(b, f) && (!genre || bookGenres(b).includes(genre)));
 }
 
-export type SortOrder = 'recent' | 'title' | 'author';
+// Il voto conta solo se il libro è letto ed è un intero da 1 a 5.
+export const ratingOf = (b: Book) => (b.read && Number.isInteger(b.rating) && b.rating! >= 1 && b.rating! <= 5 ? b.rating! : 0);
+export const todayIso = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+export type SortOrder = 'recent' | 'title' | 'author' | 'rating';
 export const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // Solo per la lista: i libri senza il valore da confrontare vanno in fondo, a parità resta l'ordine di arrivo.
 export function sortBooks(books: Book[], order: SortOrder): Book[] {
   const text = (b: Book) => norm((order === 'title' ? b.title : b.authors.find(Boolean)) || '').trim();
   return [...books].sort((a, b) => {
+    if (order === 'rating') {
+      const x = ratingOf(a), y = ratingOf(b);
+      return x && y ? y - x : x ? -1 : y ? 1 : 0;
+    }
     if (order === 'recent') {
       if (!a.added || !b.added) return a.added ? -1 : b.added ? 1 : 0;
       return a.added < b.added ? 1 : a.added > b.added ? -1 : 0;
@@ -52,6 +60,9 @@ export interface LibraryStats {
   toRead: number;
   genres: [string, number][];
   months: { key: string; label: string; count: number }[];
+  readMonths: { key: string; label: string; count: number }[];
+  rated: number;
+  avgRating: number | null;
 }
 
 export const STATS_GENRES = 8;
@@ -60,10 +71,18 @@ export const STATS_MONTHS = 6;
 // Stessi conteggi della Libreria (matchRead, genreCounts); i mesi sono gli ultimi 6 fino a `now`, in ora locale.
 export function libraryStats(books: Book[], now: Date): LibraryStats {
   const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  const months = Array.from({ length: STATS_MONTHS }, (_, i) => {
+  const blank = () => Array.from({ length: STATS_MONTHS }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (STATS_MONTHS - 1 - i), 1);
     return { key: key(d), label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), count: 0 };
   });
+  const months = blank();
+  const readMonths = blank();
+  for (const b of books) {
+    const m = b.read && b.readAt ? /^(\d{4}-\d{2})-\d{2}$/.exec(b.readAt) : null;
+    const slot = m && readMonths.find((x) => x.key === m[1]);
+    if (slot) slot.count++;
+  }
+  const ratings = books.map(ratingOf).filter(Boolean);
   for (const b of books) {
     const d = b.added ? new Date(b.added) : null;
     if (!d || Number.isNaN(d.getTime())) continue;
@@ -76,5 +95,8 @@ export function libraryStats(books: Book[], now: Date): LibraryStats {
     toRead: books.filter((b) => matchRead(b, 'toread')).length,
     genres: genreCounts(books, 'all', '').slice(0, STATS_GENRES),
     months,
+    readMonths,
+    rated: ratings.length,
+    avgRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
   };
 }
