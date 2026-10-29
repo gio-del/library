@@ -1,5 +1,5 @@
 import { Search } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../lib/api';
 import type { Candidate } from '../lib/types';
 import { Sheet } from './Sheet';
@@ -24,9 +24,11 @@ export function OnlineSearch({ title, author, onPick, className }: { title: stri
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<Candidate[] | null>(null);
   const [err, setErr] = useState('');
+  const running = useRef(false);
 
   async function search() {
-    if (busy || !title.trim()) return;
+    if (running.current || !title.trim()) return;
+    running.current = true;
     setBusy(true);
     setErr('');
     setFound(null);
@@ -37,6 +39,7 @@ export function OnlineSearch({ title, author, onPick, className }: { title: stri
     } catch (e) {
       setErr((e as Error).message);
     } finally {
+      running.current = false;
       setBusy(false);
     }
   }
