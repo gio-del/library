@@ -289,6 +289,7 @@ describe('app', () => {
       await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
       expect(sfuggeAllaPila(container)).toEqual([]);
     }
+    await userEvent.click(screen.getByRole('button', { name: /^Tutti/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     await userEvent.click(await screen.findByRole('button', { name: /^Saggio/ }));
     expect(screen.getByTestId('active-filters')).toBeInTheDocument();
