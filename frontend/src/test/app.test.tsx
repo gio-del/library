@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
@@ -321,6 +321,52 @@ describe('app', () => {
     expect((sent[0] as { genres: string[] }).genres).toEqual(['Fantasy', 'Romantasy']);
     expect(calls.filter((c) => c.startsWith('PATCH')).length).toBe(1);
   });
+  const CAND = { isbn: '9788893420938', title: 'Persuasione', authors: ['Jane Austen'], publisher: 'Newton', year: '2019', pages: '250', language: 'Italiano', source: 'sbn' };
+
+  it('«Aggiungi a mano»: la ricerca online compila solo i campi vuoti, anche con tocchi ripetuti', async () => {
+    window.innerWidth = 390;
+    const calls = server({ 'GET /api/search?title=Persuasione&author=': { candidates: [CAND, { ...CAND, isbn: '', title: 'Altro' }] } });
+    open('/scansiona/manuale');
+    const btn = await screen.findByRole('button', { name: 'Cerca online i dati mancanti' });
+    expect(btn).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Titolo (obbligatorio)'), 'Persuasione');
+    await userEvent.type(screen.getByLabelText('Editore'), 'Mio editore');
+    act(() => { btn.click(); btn.click(); });
+    expect(calls.filter((c) => c.startsWith('GET /api/search'))).toHaveLength(1);
+    const sheet = await screen.findByRole('dialog');
+    await userEvent.click(await within(sheet).findByRole('button', { name: /Persuasione/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Editore')).toHaveValue('Mio editore');
+    expect(screen.getByLabelText(/^Anno/)).toHaveValue('2019');
+    expect(screen.getByLabelText(/^Anno/).closest('div')!.textContent).toContain('da catalogo');
+    expect(screen.getByLabelText(/^Autori/)).toHaveValue('Jane Austen');
+    expect(screen.getByLabelText(/^ISBN/)).toHaveValue('9788893420938');
+    expect(screen.getByLabelText('Editore').closest('div')!.textContent).not.toContain('da catalogo');
+    expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
+  });
+
+  it('la ricerca online senza risultati lascia i campi vuoti', async () => {
+    server({ 'GET /api/search?title=Zzz&author=': { candidates: [] } });
+    open('/scansiona/manuale');
+    await userEvent.type(await screen.findByLabelText('Titolo (obbligatorio)'), 'Zzz');
+    await userEvent.click(screen.getByRole('button', { name: 'Cerca online i dati mancanti' }));
+    expect(await screen.findByText('Nessun risultato: i dati restano vuoti.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Anno/)).toHaveValue('');
+  });
+
+  it('nella scheda in modifica la ricerca online riempie i vuoti e prende i generi', async () => {
+    const book = { isbn: '9780306406171', title: 'Persuasione', authors: [] as string[], publisher: 'Già qui', genres: [] as string[] };
+    server({ 'GET /api/books': [book], 'GET /api/search?title=Persuasione&author=': { candidates: [CAND] }, 'GET /api/lookup/9788893420938': { genres: ['Narrativa'] } });
+    open('/libro/9780306406171');
+    await userEvent.click(await screen.findByRole('button', { name: /Modifica/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cerca online i dati mancanti' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Persuasione/ }));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Narrativa' })).toBeChecked());
+    expect(screen.getByLabelText('Editore')).toHaveValue('Già qui');
+    expect(screen.getByLabelText(/^Anno/)).toHaveValue('2019');
+    expect(screen.getByLabelText(/^Pagine/)).toHaveValue('250');
+  });
+
   // jsdom non calcola il layout: il controllo guarda la pila di sovrapposizione. Un elemento con z-index
   // nel contenuto di una schermata deve stare dentro un contesto isolato (isolate), altrimenti può
   // finire sopra la barra fissa dei filtri (z-10) e delle intestazioni quando si scorre.

@@ -7,6 +7,7 @@ import { useBooks } from '../state/books';
 import { CoverPicker } from '../components/CoverPicker';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
+import { OnlineSearch, fillEmpty } from '../components/OnlineSearch';
 import { Button, Field, Input, Textarea } from '../components/ui';
 
 const FIELDS: [string, string, boolean?][] = [['publisher', 'Editore'], ['year', 'Anno', true], ['edition', 'Edizione'], ['language', 'Lingua'], ['pages', 'Pagine', true]];
@@ -23,7 +24,9 @@ export function ManualForm() {
   const [titleErr, setTitleErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [dup, setDup] = useState('');
-  const set = (k: string) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const [cat, setCat] = useState<string[]>([]);
+  const lab = (k: string, label: string) => (cat.includes(k) ? `${label} · da catalogo` : label);
+  const set = (k: string) => (e: { target: { value: string } }) => { setF({ ...f, [k]: e.target.value }); setCat((c) => c.filter((x) => x !== k)); };
 
   async function send(force: boolean) {
     if (busy) return;
@@ -56,9 +59,10 @@ export function ManualForm() {
     <SubPage title="Aggiungi a mano" fallback="/scansiona">
       <form onSubmit={submit} noValidate>
         <Field label="Titolo (obbligatorio)" error={titleErr}><Input value={f.title} onChange={set('title')} maxLength={300} /></Field>
-        <Field label="Autori (separati da virgola)"><Input value={f.authors} onChange={set('authors')} /></Field>
-        {FIELDS.map(([k, label, num]) => <Field key={k} label={label}><Input value={f[k]} onChange={set(k)} inputMode={num ? 'numeric' : undefined} /></Field>)}
-        <Field label="ISBN (se c’è)"><Input value={f.isbn} onChange={set('isbn')} inputMode="numeric" autoComplete="off" /></Field>
+        <Field label={lab('authors', 'Autori (separati da virgola)')}><Input value={f.authors} onChange={set('authors')} /></Field>
+        <OnlineSearch className="my-2 w-full" title={f.title} author={f.authors} onPick={(c) => { const r = fillEmpty(f, c, ['isbn', 'authors', 'publisher', 'year', 'pages', 'language']); setF(r.form); setCat((x) => [...new Set([...x, ...r.filled])]); }} />
+        {FIELDS.map(([k, label, num]) => <Field key={k} label={lab(k, label)}><Input value={f[k]} onChange={set(k)} inputMode={num ? 'numeric' : undefined} /></Field>)}
+        <Field label={lab('isbn', 'ISBN (se c’è)')}><Input value={f.isbn} onChange={set('isbn')} inputMode="numeric" autoComplete="off" /></Field>
         <Field label="Note"><Textarea rows={3} maxLength={1000} value={f.notes} onChange={set('notes')} /></Field>
         {file && <p className="mb-0 mt-3 text-center text-sm text-muted">Copertina: {fileName}</p>}
         <CoverPicker className="my-3" onPick={(f, n) => { setFile(f); setFileName(n || ''); }} />
