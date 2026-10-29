@@ -24,7 +24,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=
   '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
 };
 const HEADERS = {
-  'content-security-policy': "default-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  'content-security-policy': "default-src 'self'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'permissions-policy': 'camera=(self)',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',

@@ -96,6 +96,7 @@ test('richiesta troppo grande: 413; pagine statiche con CSP', async (t) => {
   const home = await call('GET', '/');
   assert.strictEqual(home.status, 200);
   assert.match(home.headers.get('content-security-policy'), /default-src 'self'/);
+  assert.match(home.headers.get('content-security-policy'), /img-src 'self' blob:;/); // la foto da ritagliare è un URL blob: (#65)
   assert.strictEqual((await call('GET', '/../server.js')).status, 404);
 });
 
