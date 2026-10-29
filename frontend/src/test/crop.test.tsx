@@ -47,7 +47,7 @@ describe('Ritaglia la copertina', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Usa la foto' }));
     await waitFor(() => expect(onPick).toHaveBeenCalled());
     expect(sizes.at(-1)).toEqual([160, 240]);
-    expect(drawImage).toHaveBeenLastCalledWith(expect.anything(), 80, 120, 160, 240, 0, 0, 160, 240);
+    expect(drawImage).toHaveBeenLastCalledWith(expect.anything(), 60, 90, 160, 240, 0, 0, 160, 240);
   });
 
   it('tocchi ripetuti su «Usa la foto» = una sola consegna', async () => {
