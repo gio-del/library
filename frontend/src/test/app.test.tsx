@@ -354,6 +354,29 @@ describe('app', () => {
     expect(screen.getAllByRole('img', { name: /: 2$/ }).length).toBeGreaterThan(0);
   });
 
+  it('Statistiche: obiettivo annuale da impostare, con barra e conteggio dell’anno', async () => {
+    const d = todayIso();
+    const old = `${Number(d.slice(0, 4)) - 1}-06-01`;
+    server({
+      'GET /api/books': [{ ...BOOKS[1], readAt: d }, { ...BOOKS[0], read: true, readAt: old }, { ...BOOKS[0], isbn: '1', readAt: d }],
+      'GET /api/goal': { goal: null },
+      'PUT /api/goal': { goal: 4 },
+    });
+    open('/statistiche');
+    await userEvent.click(await screen.findByRole('button', { name: 'Imposta un obiettivo' }));
+    await userEvent.type(screen.getByLabelText('Libri da leggere quest’anno'), '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('da 1 a 999');
+    await userEvent.clear(screen.getByLabelText('Libri da leggere quest’anno'));
+    await userEvent.type(screen.getByLabelText('Libri da leggere quest’anno'), '4');
+    await userEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByText('1 di 4')).toBeInTheDocument();
+    const bar = screen.getByRole('progressbar', { name: /^Obiettivo/ });
+    expect(bar).toHaveAttribute('aria-valuenow', '1');
+    expect(bar).toHaveAttribute('aria-valuetext', '1 di 4 libri (25%)');
+    expect(screen.getByRole('button', { name: /Modifica obiettivo/ })).toBeInTheDocument();
+  });
+
   it('eliminare un libro passa da una conferma e torna all’elenco', async () => {
     const calls = server({ 'DELETE /api/books/9780306406157': {} });
     open('/libro/9780306406157');

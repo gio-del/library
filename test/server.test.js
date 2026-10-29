@@ -287,6 +287,19 @@ test('note: salvataggio, ricarica e versione sovrascritta recuperabile', async (
   assert.strictEqual((await call('PUT', '/api/notes', { text: 5, rev: 0 }, c)).status, 400);
 });
 
+test('obiettivo di lettura: sessione, validazione e persistenza', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  assert.strictEqual((await call('GET', '/api/goal')).status, 401);
+  assert.strictEqual((await call('PUT', '/api/goal', { goal: 5 })).status, 401);
+  const c = await login();
+  assert.deepStrictEqual(await (await call('GET', '/api/goal', null, c)).json(), { goal: null });
+  for (const bad of [0, 1000, -3, 2.5, '12', null, undefined, NaN]) assert.strictEqual((await call('PUT', '/api/goal', { goal: bad }, c)).status, 400, String(bad));
+  for (const ok of [1, 999]) assert.deepStrictEqual(await (await call('PUT', '/api/goal', { goal: ok }, c)).json(), { goal: ok });
+  assert.deepStrictEqual(await (await call('GET', '/api/goal', null, c)).json(), { goal: 999 });
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(dataDir, 'goal.json'), 'utf8')), { goal: 999 });
+  assert.deepStrictEqual(fs.readdirSync(dataDir).filter((f) => f.endsWith('.tmp')), []);
+});
+
 test('generi: classificati dalle fonti, correzione a mano non sovrascritta dalla riclassificazione', async (t) => {
   const f = (url) => (String(url).includes('/isbn/9780306406157.json')
     ? json({ title: 'T', authors: [], subjects: ['Horror tales', 'Ghost stories', 'Quilting'] })
