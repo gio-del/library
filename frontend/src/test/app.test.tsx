@@ -206,6 +206,32 @@ describe('app', () => {
     expect(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('il foglio Filtri ordina per voto e filtra per voto minimo con chip', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg', added: '2026-03-01' },
+      { isbn: '9780306406164', title: 'Narnia', authors: ['C. S. Lewis'], cover: 'b.jpg', added: '2026-02-01', read: true, rating: 3 },
+      { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], cover: 'c.jpg', added: '2026-01-01', read: true, rating: 5 },
+    ] });
+    const { container } = open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const titles = () => screen.getAllByRole('link', { name: /Mansfield|Narnia|Dune/ }).map((a) => a.textContent);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Voto' }));
+    const min = within(screen.getByRole('group', { name: 'Voto minimo' }));
+    await userEvent.click(min.getByRole('button', { name: '4 stelle' }));
+    await userEvent.click(min.getByRole('button', { name: '4 stelle' }));
+    expect(min.getByRole('button', { name: '4 stelle' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(titles()).toHaveLength(1);
+    expect(titles()[0]).toContain('Dune');
+    expect(screen.getByTestId('filter-dot')).toBeInTheDocument();
+    expect([...container.querySelectorAll('*')].filter((el) => /overflow-x-(auto|scroll)/.test(el.getAttribute('class') || ''))).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Voto minimo 4' }));
+    expect(titles().map((t) => t!.match(/Dune|Narnia|Mansfield/)![0])).toEqual(['Dune', 'Narnia', 'Mansfield']);
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+
   it('Gestione chiede conferma e poi rilegge i generi', async () => {
     const calls = server({ 'POST /api/books/classify': { books: [{ ...BOOKS[0], genres: ['Classici'] }], changed: 1 } });
     open('/libreria');
