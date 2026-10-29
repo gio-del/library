@@ -22,7 +22,7 @@ Poi apri `http://127.0.0.1:8080`. Per la fotocamera il browser vuole HTTPS (mett
 
 ## API
 
-`GET /api/auth/status` (libero), `POST /api/login`, `POST /api/logout`, `GET /api/books`, `POST /api/books {isbn}`, `DELETE /api/books/:isbn`. Tutto tranne lo stato e il login richiede la sessione.
+`GET /api/auth/status` (libero), `POST /api/login`, `POST /api/logout`, `GET /api/books`, `POST /api/books {isbn}`, `DELETE /api/books/:isbn`, `GET /api/books/export?format=json|csv` (allegato con tutti i libri; il CSV ha ISBN, titolo, autori, editore, anno, letto, generi, note e protegge le celle che iniziano con `=`, `+`, `-`, `@`), `POST /api/books/import` (corpo: il JSON esportato, max 5 MB; aggiunge i libri mancanti senza sovrascrivere quelli con lo stesso ISBN e risponde `{added, skipped, invalid}`; le copertine non sono incluse, le recupera «Cerca di nuovo i dati»). Tutto tranne lo stato e il login richiede la sessione.
 
 ## Test
 

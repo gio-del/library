@@ -214,6 +214,29 @@ describe('app', () => {
     expect(await screen.findByText('Generi aggiornati su 1 libri')).toBeInTheDocument();
   });
 
+  it('Gestione: esporta come allegato e importa un file con il riepilogo', async () => {
+    const calls = server({ 'POST /api/books/import': { added: 2, skipped: 1, invalid: 0 } });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Altro' }));
+    expect(await screen.findByRole('menuitem', { name: /Esporta \(JSON\)/ })).toHaveAttribute('href', '/api/books/export?format=json');
+    expect(screen.getByRole('menuitem', { name: /Esporta \(CSV\)/ })).toHaveAttribute('href', '/api/books/export?format=csv');
+    await userEvent.click(screen.getByRole('menuitem', { name: /Importa/ }));
+    const file = new File([JSON.stringify([{ isbn: '9780306406157' }])], 'libreria.json', { type: 'application/json' });
+    await userEvent.upload(screen.getByLabelText('File da importare'), file);
+    expect(await screen.findByText('Aggiunti 2 libri, saltati 1')).toBeInTheDocument();
+    expect(calls.filter((c) => c === 'POST /api/books/import').length).toBe(1);
+  });
+
+  it('Gestione: un file che non è JSON dà un errore e non chiama il server', async () => {
+    const calls = server();
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.upload(screen.getByLabelText('File da importare'), new File(['{rotto'], 'x.json', { type: 'application/json' }));
+    expect(await screen.findByText('Il file non è un JSON valido')).toBeInTheDocument();
+    expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
+  });
+
   it('un doppio tocco su «Segna come letto» manda una sola richiesta', async () => {
     const calls = server({ 'PATCH /api/books/9780306406157': { book: { ...BOOKS[0], read: true } } });
     open('/libro/9780306406157');
