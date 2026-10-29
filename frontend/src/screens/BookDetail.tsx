@@ -7,6 +7,9 @@ import { isbn10Of } from '../lib/isbn';
 import type { Book, Candidate } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
+import { useAuth } from '../state/auth';
+import { fillFromRead, READ_LABELS, type CoverRead } from '../lib/coverRead';
+import { ReadPhotoButton } from '../components/ReadPhotoButton';
 import { CoverPicker } from '../components/CoverPicker';
 import { CoverViewer } from '../components/CoverViewer';
 import { Confirm } from '../components/Confirm';
@@ -48,6 +51,8 @@ export function BookDetail() {
   const [coverV, setCoverV] = useState(0);
   const [askDelete, setAskDelete] = useState(false);
   const lock = useLock();
+  const { coverRead } = useAuth();
+  const [fromPhoto, setFromPhoto] = useState<string[]>([]);
 
   useEffect(() => { if (!loaded) load().catch(() => {}); }, [loaded, load]);
   useEffect(() => { if (loc.state?.note) toast(loc.state.note); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -71,6 +76,7 @@ export function BookDetail() {
     for (const k of EDIT) f[k] = String(book![k] ?? '');
     setForm(f);
     setFormErr('');
+    setFromPhoto([]);
     setCat([]);
     setEditing(true);
   }
@@ -126,12 +132,25 @@ export function BookDetail() {
     });
   }
 
+  function applyRead(r: CoverRead): string {
+    const { form: next, filled } = fillFromRead(form, r);
+    setForm(next);
+    setFromPhoto([...new Set([...fromPhoto, ...filled])]);
+    return filled.length ? `Compilati dalla foto: ${filled.map((k) => READ_LABELS[k].toLowerCase()).join(', ')}. Controlla e premi «Salva».` : 'Niente da compilare: i campi sono già pieni o la foto non dice altro.';
+  }
+  const mark = (k: string) => (fromPhoto.includes(k) ? ' (dalla foto)' : '');
+  const photo = async () => {
+    const res = await fetch(`/covers/${book!.cover}`);
+    if (!res.ok) throw new Error('Non riesco a leggere la copertina');
+    return res.blob();
+  };
+
   if (editing) {
     return (
       <SubPage title="Modifica" fallback="/libreria">
         <form onSubmit={(e) => void save(e)}>
-          <Field label="Titolo" error={formErr}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-          <Field label={lab(cat, 'authors', 'Autori (separati da virgola)')}><Input value={form.authors} onChange={(e) => { setForm({ ...form, authors: e.target.value }); setCat(cat.filter((x) => x !== 'authors')); }} /></Field>
+          <Field label={`Titolo${mark('title')}`} error={formErr}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <Field label={`${lab(cat, 'authors', 'Autori (separati da virgola)')}${mark('authors')}`}><Input value={form.authors} onChange={(e) => { setForm({ ...form, authors: e.target.value }); setCat(cat.filter((x) => x !== 'authors')); setFromPhoto(fromPhoto.filter((x) => x !== 'authors')); }} /></Field>
           <OnlineSearch className="my-2 w-full" title={form.title} author={form.authors} onPick={(c) => void fromCatalog(c)} />
           <fieldset className="mt-4 min-w-0 border-0 p-0">
             <legend className="mb-1 text-sm font-medium text-muted">{lab(cat, 'genres', `Generi (fino a ${MAX_GENRES})`)}</legend>
@@ -148,9 +167,10 @@ export function BookDetail() {
             </div>
           </fieldset>
           {EDIT.filter((k) => k !== 'title' && k !== 'notes').map((k) => (
-            <Field key={k} label={lab(cat, k, LABELS[k])}><Input value={form[k]} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => { setForm({ ...form, [k]: e.target.value }); setCat(cat.filter((x) => x !== k)); }} /></Field>
+            <Field key={k} label={`${lab(cat, k, LABELS[k])}${mark(k)}`}><Input value={form[k]} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => { setForm({ ...form, [k]: e.target.value }); setCat(cat.filter((x) => x !== k)); setFromPhoto(fromPhoto.filter((x) => x !== k)); }} /></Field>
           ))}
           <Field label="Note"><Textarea rows={3} maxLength={1000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+          {coverRead && book.cover && <div className="mt-4"><ReadPhotoButton getPhoto={photo} onRead={applyRead} disabled={busy} /></div>}
           <div className="mt-4 flex flex-col gap-2">
             <Button type="submit" disabled={busy}>Salva</Button>
             <Button variant="ghost" onClick={() => setEditing(false)}>Annulla</Button>

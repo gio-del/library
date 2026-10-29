@@ -2,8 +2,12 @@ import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
 import { looksLikeIsbn } from '../lib/isbn';
+import type { CoverRead } from '../lib/coverRead';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
+import { useAuth } from '../state/auth';
+import { fillFromRead, READ_LABELS } from '../lib/coverRead';
+import { ReadPhotoButton } from '../components/ReadPhotoButton';
 import { CoverPicker } from '../components/CoverPicker';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
@@ -16,6 +20,8 @@ export function ManualForm() {
   const nav = useNavigate();
   const { state } = useLocation() as { state: { query?: string } | null };
   const { upsert } = useBooks();
+  const { coverRead } = useAuth();
+  const [fromPhoto, setFromPhoto] = useState<string[]>([]);
   const t = (state?.query || '').trim();
   const [f, setF] = useState<Record<string, string>>({ title: looksLikeIsbn(t) ? '' : t, isbn: looksLikeIsbn(t) ? t : '', authors: '', publisher: '', year: '', edition: '', language: '', pages: '', notes: '' });
   const [file, setFile] = useState<Blob | null>(null);
@@ -25,8 +31,15 @@ export function ManualForm() {
   const [busy, setBusy] = useState(false);
   const [dup, setDup] = useState('');
   const [cat, setCat] = useState<string[]>([]);
-  const lab = (k: string, label: string) => (cat.includes(k) ? `${label} · da catalogo` : label);
-  const set = (k: string) => (e: { target: { value: string } }) => { setF({ ...f, [k]: e.target.value }); setCat((c) => c.filter((x) => x !== k)); };
+  const lab = (k: string, label: string) => (cat.includes(k) ? `${label} · da catalogo` : label) + (fromPhoto.includes(k) ? ' (dalla foto)' : '');
+  const set = (k: string) => (e: { target: { value: string } }) => { setF({ ...f, [k]: e.target.value }); setCat((c) => c.filter((x) => x !== k)); setFromPhoto((p) => p.filter((x) => x !== k)); };
+
+  function applyRead(r: CoverRead): string {
+    const { form, filled } = fillFromRead(f, r);
+    setF(form);
+    setFromPhoto([...new Set([...fromPhoto, ...filled])]);
+    return filled.length ? `Compilati dalla foto: ${filled.map((k) => READ_LABELS[k].toLowerCase()).join(', ')}. Controlla e premi «Salva».` : 'Niente da compilare: i campi sono già pieni o la foto non dice altro.';
+  }
 
   async function send(force: boolean) {
     if (busy) return;
@@ -58,7 +71,7 @@ export function ManualForm() {
   return (
     <SubPage title="Aggiungi a mano" fallback="/scansiona">
       <form onSubmit={submit} noValidate>
-        <Field label="Titolo (obbligatorio)" error={titleErr}><Input value={f.title} onChange={set('title')} maxLength={300} /></Field>
+        <Field label={lab('title', 'Titolo (obbligatorio)')} error={titleErr}><Input value={f.title} onChange={set('title')} maxLength={300} /></Field>
         <Field label={lab('authors', 'Autori (separati da virgola)')}><Input value={f.authors} onChange={set('authors')} /></Field>
         <OnlineSearch className="my-2 w-full" title={f.title} author={f.authors} onPick={(c) => { const r = fillEmpty(f, c, ['isbn', 'authors', 'publisher', 'year', 'pages', 'language']); setF(r.form); setCat((x) => [...new Set([...x, ...r.filled])]); }} />
         {FIELDS.map(([k, label, num]) => <Field key={k} label={lab(k, label)}><Input value={f[k]} onChange={set(k)} inputMode={num ? 'numeric' : undefined} /></Field>)}
@@ -66,6 +79,7 @@ export function ManualForm() {
         <Field label="Note"><Textarea rows={3} maxLength={1000} value={f.notes} onChange={set('notes')} /></Field>
         {file && <p className="mb-0 mt-3 text-center text-sm text-muted">Copertina: {fileName}</p>}
         <CoverPicker className="my-3" onPick={(f, n) => { setFile(f); setFileName(n || ''); }} />
+        {coverRead && file && <div className="mb-3"><ReadPhotoButton getPhoto={() => toJpeg(file)} onRead={applyRead} disabled={busy} /></div>}
         {err && <p role="alert" className="text-ko">{err}</p>}
         <div className="mt-4 flex flex-col gap-2">
           <Button type="submit" disabled={busy}>Salva</Button>

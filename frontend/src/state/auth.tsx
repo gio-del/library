@@ -4,6 +4,7 @@ import { api, setUnauthorizedHandler } from '../lib/api';
 type Status = 'loading' | 'in' | 'out';
 interface AuthValue {
   status: Status;
+  coverRead: boolean;
   login(user: string, password: string): Promise<void>;
   logout(): Promise<void>;
 }
@@ -12,11 +13,12 @@ const Ctx = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
+  const [coverRead, setCoverRead] = useState(false);
 
   useEffect(() => {
     setUnauthorizedHandler(() => setStatus('out'));
-    api<{ authenticated: boolean }>('GET', '/api/auth/status')
-      .then((s) => setStatus(s.authenticated ? 'in' : 'out'))
+    api<{ authenticated: boolean; coverRead?: boolean }>('GET', '/api/auth/status')
+      .then((s) => { setCoverRead(Boolean(s.coverRead)); setStatus(s.authenticated ? 'in' : 'out'); })
       .catch(() => setStatus('out'));
   }, []);
 
@@ -29,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('out');
   }, []);
 
-  const value = useMemo(() => ({ status, login, logout }), [status, login, logout]);
+  const value = useMemo(() => ({ status, coverRead, login, logout }), [status, coverRead, login, logout]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
