@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
@@ -331,7 +331,7 @@ describe('app', () => {
     expect(btn).toBeDisabled();
     await userEvent.type(screen.getByLabelText('Titolo (obbligatorio)'), 'Persuasione');
     await userEvent.type(screen.getByLabelText('Editore'), 'Mio editore');
-    await userEvent.dblClick(btn);
+    act(() => { btn.click(); btn.click(); });
     expect(calls.filter((c) => c.startsWith('GET /api/search'))).toHaveLength(1);
     const sheet = await screen.findByRole('dialog');
     await userEvent.click(await within(sheet).findByRole('button', { name: /Persuasione/ }));
