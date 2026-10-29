@@ -10,11 +10,11 @@ const { createNotes, MAX_TEXT } = require('./lib/notes');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
 const { classify, MAX_GENRES } = require('./lib/genres');
+const { cleanFields, toCsv, parseImport } = require('./lib/exporter');
 
 const MAX_BODY = 4096;
 const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
-// campi modificabili a mano dalla scheda, con la lunghezza massima
-const EDITABLE = { title: 300, authors: 200, publisher: 200, year: 20, edition: 200, series: 200, pages: 10, language: 50, notes: 1000 };
+const MAX_IMPORT = 5 * 1024 * 1024;
 // chiave di un libro: ISBN-13, oppure «m» + 12 esadecimali per i libri aggiunti a mano senza ISBN
 const KEY = '(?:\\d{13}|m[0-9a-f]{12})';
 const keyRe = (before, after = '') => new RegExp(`^${before}(${KEY})${after}$`);
@@ -162,22 +162,6 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     return changed;
   }
 
-  // Valida e ripulisce i campi di testo modificabili presenti in `b`.
-  function cleanFields(b) {
-    const fields = {};
-    for (const [k, max] of Object.entries(EDITABLE)) {
-      if (!(k in b)) continue;
-      if (k === 'authors') {
-        if (!Array.isArray(b.authors) || b.authors.length > 20 || b.authors.some((a) => typeof a !== 'string')) return { error: 'Autori non validi' };
-        fields.authors = b.authors.map((a) => a.trim().slice(0, max)).filter(Boolean);
-      } else {
-        if (typeof b[k] !== 'string') return { error: 'Campo non valido' };
-        fields[k] = b[k].trim().slice(0, max);
-      }
-    }
-    return { fields };
-  }
-
   const sameText = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
   // Libro inserito a mano: titolo obbligatorio, ISBN facoltativo; avvisa se titolo e autori esistono già.
@@ -235,6 +219,22 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const q = (url.searchParams.get('q') || '').slice(0, 100);
       const all = await store.list();
       return send(res, 200, q.trim() ? all.filter((x) => matches(x, q)) : all);
+    }
+    if (req.method === 'GET' && p === '/api/books/export') {
+      const format = url.searchParams.get('format');
+      if (format !== 'json' && format !== 'csv') return send(res, 400, { error: 'Formato non valido' });
+      const all = await store.list();
+      const day = new Date(now()).toISOString().slice(0, 10);
+      const disposition = { 'content-disposition': `attachment; filename="libreria-${day}.${format}"` };
+      if (format === 'json') return send(res, 200, JSON.stringify(all, null, 2) + '\n', { ...disposition, 'content-type': 'application/json; charset=utf-8' });
+      return send(res, 200, toCsv(all), { ...disposition, 'content-type': 'text/csv; charset=utf-8' });
+    }
+    if (req.method === 'POST' && p === '/api/books/import') {
+      const r = parseImport((await readRaw(req, MAX_IMPORT)).toString('utf8'));
+      if (r.error) return send(res, 400, { error: r.error });
+      let added = 0;
+      for (const b of r.books) if (await store.add(b)) added++;
+      return send(res, 200, { added, skipped: r.books.length - added, invalid: r.invalid });
     }
     if (req.method === 'POST' && p === '/api/books') {
       const body = await readJson(req);

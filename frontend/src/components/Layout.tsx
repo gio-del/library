@@ -1,6 +1,6 @@
 import { Dialog, DropdownMenu } from 'radix-ui';
-import { EllipsisVertical, X, Library, LogOut, NotebookPen, RefreshCw, ScanBarcode, Tags, type LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { Download, EllipsisVertical, X, Library, LogOut, NotebookPen, RefreshCw, ScanBarcode, Tags, Upload, type LucideIcon } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { api } from '../lib/api';
 import { cn } from '../lib/cn';
@@ -46,6 +46,21 @@ export function TopBar() {
   const lock = useLock();
   const [ask, setAsk] = useState<Manage | null>(null);
   const missing = books.filter(needsRetry).length;
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function importFile(file: File | undefined) {
+    if (!file) return;
+    await lock('manage', async () => {
+      toast('Importo i libri…');
+      try {
+        let data: unknown;
+        try { data = JSON.parse(await file.text()); } catch { throw new Error('Il file non è un JSON valido'); }
+        const r = await api<{ added: number; skipped: number; invalid: number }>('POST', '/api/books/import', data);
+        await load();
+        toast(`Aggiunti ${r.added} libri, saltati ${r.skipped}${r.invalid ? `, non validi ${r.invalid}` : ''}`);
+      } catch (e) { toast((e as Error).message, true); }
+    });
+  }
 
   async function run(what: Manage) {
     await lock('manage', async () => {
@@ -90,11 +105,15 @@ export function TopBar() {
             <DropdownMenu.Label className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">Gestione</DropdownMenu.Label>
             <DropdownMenu.Item className={item} onSelect={() => setAsk('classify')}><Tags aria-hidden className="size-5 text-plum" />Rileggi i generi</DropdownMenu.Item>
             <DropdownMenu.Item className={item} onSelect={() => setAsk('retry')}><RefreshCw aria-hidden className="size-5 text-plum" />Cerca di nuovo i dati{missing > 0 && <span className="ml-auto rounded-full bg-gold px-2 text-xs font-semibold text-plum">{missing}</span>}</DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=json" download><Download aria-hidden className="size-5 text-plum" />Esporta (JSON)</a></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=csv" download><Download aria-hidden className="size-5 text-plum" />Esporta (CSV)</a></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} onSelect={() => fileInput.current?.click()}><Upload aria-hidden className="size-5 text-plum" />Importa</DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1.5 h-px bg-lilac/60" />
             <DropdownMenu.Item className={item} onSelect={() => void logout()}><LogOut aria-hidden className="size-5 text-plum" />Esci</DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+      <input ref={fileInput} type="file" accept="application/json,.json" aria-label="File da importare" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void importFile(f); }} />
       <Confirm open={ask === 'classify'} onOpenChange={(o) => !o && setAsk(null)} title="Rileggere i generi?" action="Rileggi i generi" onConfirm={() => void run('classify')}>
         Cerco di nuovo il genere di ogni libro. Quelli che hai corretto a mano non vengono toccati.
       </Confirm>

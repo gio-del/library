@@ -392,3 +392,37 @@ test('indirizzi dell’app: la pagina è la stessa, i file inesistenti restano 4
   assert.strictEqual((await call('GET', '/assets/../server.js')).status, 404);
   assert.strictEqual((await call('GET', '/assets/nonesiste.js')).status, 404);
 });
+
+test('export JSON e CSV: sessione richiesta, allegato; import aggiunge e non sovrascrive', async (t) => {
+  const { call, login } = await start(t);
+  assert.strictEqual((await call('GET', '/api/books/export?format=json')).status, 401);
+  assert.strictEqual((await call('POST', '/api/books/import', [])).status, 401);
+  const cookie = await login();
+  await call('POST', '/api/books', { manual: true, title: 'Mio libro', authors: ['Ada'] }, cookie);
+  const j = await call('GET', '/api/books/export?format=json', undefined, cookie);
+  assert.match(j.headers.get('content-disposition'), /^attachment; filename="libreria-.*\.json"$/);
+  const exported = JSON.parse(await j.text());
+  assert.strictEqual(exported[0].title, 'Mio libro');
+  const c = await call('GET', '/api/books/export?format=csv', undefined, cookie);
+  assert.match(c.headers.get('content-disposition'), /\.csv"$/);
+  assert.match(await c.text(), /Mio libro,Ada/);
+  assert.strictEqual((await call('GET', '/api/books/export?format=xml', undefined, cookie)).status, 400);
+
+  const incoming = [{ ...exported[0], title: 'Cambiato' }, { isbn: '9780306406157', title: 'Nuovo', authors: ['Z'] }, { isbn: 'zz' }];
+  const r = await call('POST', '/api/books/import', incoming, cookie);
+  assert.deepStrictEqual(await r.json(), { added: 1, skipped: 1, invalid: 1 });
+  const all = await (await call('GET', '/api/books', undefined, cookie)).json();
+  assert.strictEqual(all.length, 2);
+  assert.strictEqual(all.find((b) => b.isbn === exported[0].isbn).title, 'Mio libro');
+  const again = await (await call('POST', '/api/books/import', incoming, cookie)).json();
+  assert.strictEqual(again.added, 0);
+});
+
+test('import: JSON malformato 400, corpo troppo grande 413', async (t) => {
+  const { login, call } = await start(t);
+  const cookie = await login();
+  const base = (await call('GET', '/api/auth/status')).url.replace('/api/auth/status', '');
+  const post = (body) => fetch(base + '/api/books/import', { method: 'POST', headers: { cookie }, body });
+  assert.strictEqual((await post('{rotto')).status, 400);
+  assert.strictEqual((await post(' '.repeat(5 * 1024 * 1024 + 1))).status, 413);
+});
