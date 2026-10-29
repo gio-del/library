@@ -85,3 +85,12 @@ describe('Ritaglia la copertina', () => {
     expect(s.w).toBeCloseTo(0.1); expect(s.h).toBeCloseTo(0.1);
   });
 });
+
+describe('Ritaglia la copertina: foto che non si carica (#65)', () => {
+  it("se l'immagine non si carica mostra l'errore invece del riquadro vuoto", async () => {
+    await pick();
+    fireEvent.error(screen.getByAltText('Foto da ritagliare'));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Immagine non leggibile: scegline un'altra.");
+    expect(screen.queryByTestId('crop-box')).not.toBeInTheDocument();
+  });
+});

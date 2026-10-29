@@ -116,7 +116,7 @@ function Body({ photo, onUse, onCancel }: { photo: Blob; onUse(b: Blob): void; o
       {img && (
         <div className="flex justify-center px-[22px]">
           <div ref={stage} data-testid="crop-stage" className="relative inline-block max-w-full touch-none select-none">
-            <img src={img.url} alt="Foto da ritagliare" draggable={false} className="block max-h-[45dvh] max-w-full" />
+            <img src={img.url} alt="Foto da ritagliare" draggable={false} onError={() => { setImg(null); setError('Immagine non leggibile: scegline un\'altra.'); }} className="block max-h-[45dvh] max-w-full" />
             <div aria-hidden className="pointer-events-none absolute inset-0 bg-ink/50" style={{ clipPath: clip }} />
             <div
               role="group" aria-label="Riquadro di ritaglio" data-testid="crop-box"
