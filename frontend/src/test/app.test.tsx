@@ -181,9 +181,9 @@ describe('app', () => {
   it('il foglio Filtri ordina la lista per titolo e autore e si azzera', async () => {
     window.innerWidth = 390;
     server({ 'GET /api/books': [
-      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], added: '2026-01-01' },
-      { isbn: '9780306406164', title: 'Narnia', authors: ['C. S. Lewis'], added: '2026-02-01' },
-      { isbn: '9780306406171', title: 'Àlbum', authors: ['Zola'], added: '2026-03-01' },
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg', added: '2026-01-01' },
+      { isbn: '9780306406164', title: 'Narnia', authors: ['C. S. Lewis'], cover: 'b.jpg', added: '2026-02-01' },
+      { isbn: '9780306406171', title: 'Àlbum', authors: ['Zola'], cover: 'c.jpg', added: '2026-03-01' },
     ] });
     open('/libreria');
     await screen.findByText('Mansfield Park');
