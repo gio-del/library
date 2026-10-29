@@ -1,4 +1,4 @@
-import { bookGenres, filterBooks, genreCounts, needsRetry, sortBooks } from '../lib/books';
+import { bookGenres, filterBooks, genreCounts, libraryStats, needsRetry, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -49,5 +49,30 @@ describe('sortBooks', () => {
     const l = [b({ isbn: 'a', title: 'zeta', authors: ['Zed'] }), b({ isbn: 'n' }), b({ isbn: 'e', title: 'Èco', authors: ['Eco'] }), b({ isbn: 'd', title: 'dune', authors: ['Álvaro'] })];
     expect(ids(sortBooks(l, 'title'))).toEqual(['d', 'e', 'a', 'n']);
     expect(ids(sortBooks(l, 'author'))).toEqual(['d', 'e', 'a', 'n']);
+  });
+});
+
+describe('libraryStats', () => {
+  const now = new Date(2026, 9, 29);
+  const list = [
+    b({ genres: ['Narrativa'], read: true, added: new Date(2026, 9, 2).toISOString() }),
+    b({ genres: ['Narrativa', 'Saggio'], added: new Date(2026, 4, 20).toISOString() }),
+    b({ added: new Date(2026, 3, 20).toISOString() }),
+    b({ added: 'non una data' }),
+  ];
+  it('conta come la Libreria', () => {
+    const s = libraryStats(list, now);
+    expect([s.total, s.read, s.toRead]).toEqual([4, 1, 3]);
+    expect(s.genres).toEqual(genreCounts(list, 'all', ''));
+  });
+  it('limita i generi a 8 e raggruppa gli ultimi 6 mesi', () => {
+    const many = Array.from({ length: 10 }, (_, i) => b({ genres: [`G${i}`] }));
+    expect(libraryStats(many, now).genres).toHaveLength(8);
+    const m = libraryStats(list, now).months;
+    expect(m.map((x) => x.key)).toEqual(['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']);
+    expect(m.map((x) => x.count)).toEqual([1, 0, 0, 0, 0, 1]);
+  });
+  it('con libreria vuota non fallisce', () => {
+    expect(libraryStats([], now)).toMatchObject({ total: 0, read: 0, toRead: 0, genres: [] });
   });
 });
