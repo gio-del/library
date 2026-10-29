@@ -95,8 +95,8 @@ export function Scan() {
         {!scanner.active && <p className="flex items-center justify-center gap-2 bg-lilac-soft py-6 text-plum"><Camera aria-hidden className="size-8" />Inquadra il codice a barre</p>}
         <div className="p-3">
           {scanner.active
-            ? <Button variant="ghost" className="w-full" onClick={scanner.stop}>Chiudi la fotocamera</Button>
-            : <Button className="w-full" onClick={() => void scanner.start()}>Apri la fotocamera</Button>}
+            ? <Button key="close" variant="ghost" className="w-full" onClick={scanner.stop}>Chiudi la fotocamera</Button>
+            : <Button key="open" className="w-full" onClick={() => void scanner.start()}>Apri la fotocamera</Button>}
         </div>
       </div>
       <Msg text={msg} error={err} />
