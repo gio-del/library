@@ -84,6 +84,7 @@ describe('lettura dalla foto', () => {
     expect(screen.queryByRole('button', { name: 'Leggi i dati dalla foto' })).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: /Modifica/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Leggi i dati dalla foto' }));
+    await screen.findByText(/Compilati|Non riesco|Lettura/).then((e) => console.log('MSG', e.textContent));
     await waitFor(() => expect(screen.getByLabelText('Titolo (dalla foto)')).toHaveValue('Il nome della rosa'));
     expect(screen.getByLabelText('Editore')).toHaveValue('Mio editore');
     expect(within(screen.getByRole('status')).getByText(/titolo, autori, lingua/)).toBeInTheDocument();
