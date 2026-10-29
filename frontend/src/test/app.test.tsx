@@ -192,12 +192,14 @@ describe('app', () => {
     expect(titles()[0]).toContain('Àlbum');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     const group = await screen.findByRole('group', { name: 'Ordina per' });
-    expect(within(group).getAllByRole('button')).toHaveLength(3);
+    expect(within(group).getAllByRole('button')).toHaveLength(4);
     expect(within(group).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     expect(within(group).getByRole('button', { name: 'Titolo A→Z' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(within(group).getByRole('button', { name: 'Autore A→Z' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Voto' }));
+    expect(within(group).getByRole('button', { name: 'Voto' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Azzera tutto' }));
     expect(titles()[0]).toContain('Àlbum');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
