@@ -1,4 +1,4 @@
-import { bookGenres, filterBooks, genreCounts, libraryStats, needsRetry, sortBooks } from '../lib/books';
+import { bookGenres, filterBooks, genreCounts, libraryStats, needsRetry, seriesCounts, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -31,6 +31,12 @@ describe('books', () => {
     expect(filterBooks(list, 'toread', 'Narrativa').map((x) => x.isbn)).toEqual(['2']);
     expect(genreCounts(list, 'toread', '')).toEqual([['Narrativa', 1], ['Saggio', 1]]);
     expect(genreCounts(list, 'read', 'Saggio')).toEqual([['Narrativa', 1], ['Saggio', 0]]);
+  });
+  it('conta le collane sullo stato attivo e ignora i libri senza collana', () => {
+    const list = [b({ isbn: '1', series: 'Dune', read: true }), b({ isbn: '2', series: 'Dune' }), b({ isbn: '3', series: ' Narnia ' }), b({ isbn: '4' })];
+    expect(seriesCounts(list, 'all', '')).toEqual([['Dune', 2], ['Narnia', 1]]);
+    expect(seriesCounts(list, 'read', 'Narnia')).toEqual([['Dune', 1], ['Narnia', 0]]);
+    expect(seriesCounts([b({})], 'all', '')).toEqual([]);
   });
   it('rifare la ricerca serve solo con ISBN e dati o copertina mancanti', () => {
     expect(needsRetry(b({ cover: null }))).toBe(true);

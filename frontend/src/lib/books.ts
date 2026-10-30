@@ -25,6 +25,18 @@ export function genreCounts(books: Book[], f: ReadFilter, selected: string): [st
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
 }
 
+export const seriesOf = (b: Book) => (typeof b.series === 'string' ? b.series.trim() : '');
+
+export function seriesCounts(books: Book[], f: ReadFilter, selected: string): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const b of books.filter((x) => matchRead(x, f))) {
+    const s = seriesOf(b);
+    if (s) counts.set(s, (counts.get(s) || 0) + 1);
+  }
+  if (selected && !counts.has(selected)) counts.set(selected, 0);
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
+}
+
 export function filterBooks(books: Book[], f: ReadFilter, genre: string): Book[] {
   return books.filter((b) => matchRead(b, f) && (!genre || bookGenres(b).includes(genre)));
 }
