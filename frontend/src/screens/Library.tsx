@@ -1,7 +1,7 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { bookGenres, bookTitle, genreCounts, matchRead, norm, ratingOf, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
+import { bookGenres, bookTitle, genreCounts, matchRead, norm, ratingOf, seriesCounts, seriesOf, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -10,12 +10,13 @@ import { Sheet } from '../components/Sheet';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
 const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
-const matchText = (b: Book, q: string) => !q || norm([b.title, ...b.authors].filter(Boolean).join(' ')).includes(q);
+const matchText = (b: Book, q: string) => !q || norm([b.title, ...b.authors, b.series].filter(Boolean).join(' ')).includes(q);
 
 export function Library() {
   const { books, loaded, load } = useBooks();
   const [state, setState] = useState<ReadFilter>('all');
   const [genre, setGenre] = useState('');
+  const [series, setSeries] = useState('');
   const [minRating, setMinRating] = useState(0);
   const [order, setOrder] = useState<SortOrder>('recent');
   const [query, setQuery] = useState('');
@@ -24,17 +25,18 @@ export function Library() {
   const { key } = useLocation();
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
-  useEffect(() => { setState('all'); setGenre(''); setMinRating(0); setQuery(''); setOrder('recent'); }, [key]);
+  useEffect(() => { setState('all'); setGenre(''); setSeries(''); setMinRating(0); setQuery(''); setOrder('recent'); }, [key]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
 
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchText(b, q)), [books, q]);
-  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && ratingOf(b) >= minRating), order), [searched, state, genre, minRating, order]);
+  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesOf(b) === series) && ratingOf(b) >= minRating), order), [searched, state, genre, series, minRating, order]);
   const genres = genreCounts(searched, state, genre);
+  const seriesList = seriesCounts(searched, state, series);
   const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
-  const active = state !== 'all' || genre !== '' || minRating > 0 || q !== '' || order !== 'recent';
+  const active = state !== 'all' || genre !== '' || series !== '' || minRating > 0 || q !== '' || order !== 'recent';
 
   let status = '';
   if (err) status = err;
@@ -52,7 +54,7 @@ export function Library() {
           </div>
           <button type="button" aria-label="Filtri" onClick={() => setOpen(true)} className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-plum-2 text-white">
             <SlidersHorizontal aria-hidden />
-            {(genre || minRating > 0) && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
+            {(genre || series || minRating > 0) && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
           </button>
         </div>
         <div role="group" aria-label="Stato" className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-lilac-soft p-1">
@@ -60,9 +62,10 @@ export function Library() {
             <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-plum')}>{label} ({count(f)})</button>
           ))}
         </div>
-        {(genre || minRating > 0) && (
+        {(genre || series || minRating > 0) && (
           <div data-testid="active-filters" className="mt-2 flex flex-wrap gap-2">
             {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {series && <button type="button" onClick={() => setSeries('')} aria-label={`Togli il filtro Collana ${series}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">Collana {series}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {minRating > 0 && <button type="button" onClick={() => setMinRating(0)} aria-label={`Togli il filtro Voto minimo ${minRating}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0">Voto minimo {minRating}</span><X aria-hidden className="size-4 shrink-0" /></button>}
           </div>
         )}
@@ -101,7 +104,16 @@ export function Library() {
           <GenreRow label="Tutti i generi" count={count(state)} on={genre === ''} onPick={() => { setGenre(''); setOpen(false); }} />
           {genres.map(([g, c]) => <GenreRow key={g} label={g} count={c} on={genre === g} onPick={() => { setGenre(g); setOpen(false); }} />)}
         </div>
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setMinRating(0); setQuery(''); setOrder('recent'); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
+        {seriesList.length > 0 && (
+          <>
+            <p className="mb-2 mt-4 text-sm font-medium text-muted">Collana</p>
+            <div role="group" aria-label="Collana" className="flex flex-col gap-2">
+              <GenreRow label="Tutte le collane" count={count(state)} on={series === ''} onPick={() => { setSeries(''); setOpen(false); }} />
+              {seriesList.map(([s, c]) => <GenreRow key={s} label={s} count={c} on={series === s} onPick={() => { setSeries(s); setOpen(false); }} />)}
+            </div>
+          </>
+        )}
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setMinRating(0); setQuery(''); setOrder('recent'); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );
@@ -110,7 +122,7 @@ export function Library() {
 function GenreRow({ label, count, on, onPick }: { label: string; count: number; on: boolean; onPick(): void }) {
   return (
     <button type="button" aria-pressed={on} onClick={onPick} className={cn('flex min-h-12 items-center justify-between rounded-xl px-4 text-left', on ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>
-      <span className="font-medium">{label}</span><span className={cn('text-sm', on ? 'text-white/80' : 'text-muted')}>{count}</span>
+      <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{label}</span><span className={cn('ml-3 shrink-0 text-sm', on ? 'text-white/80' : 'text-muted')}>{count}</span>
     </button>
   );
 }

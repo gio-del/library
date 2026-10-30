@@ -232,6 +232,46 @@ describe('app', () => {
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
   });
 
+  it('il foglio Filtri filtra per collana, la ricerca la trova e il chip la toglie', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg', added: '2026-03-01' },
+      { isbn: '9780306406164', title: 'Il leone', authors: ['C. S. Lewis'], cover: 'b.jpg', added: '2026-02-01', series: 'Le cronache di Narnia, una collana dal nome molto molto lungo' },
+      { isbn: '9780306406171', title: 'Il principe Caspian', authors: ['C. S. Lewis'], cover: 'c.jpg', added: '2026-01-01', read: true, series: 'Le cronache di Narnia, una collana dal nome molto molto lungo' },
+    ] });
+    const { container } = open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const titles = () => screen.getAllByRole('link', { name: /Mansfield|leone|Caspian/ }).map((a) => a.textContent);
+    await userEvent.type(screen.getByRole('searchbox'), 'cronache');
+    expect(titles()).toHaveLength(2);
+    await userEvent.clear(screen.getByRole('searchbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const group = within(await screen.findByRole('group', { name: 'Collana' }));
+    const pick = group.getByRole('button', { name: /Le cronache di Narnia/ });
+    expect(pick).toHaveTextContent('2');
+    await userEvent.click(pick);
+    expect(titles()).toHaveLength(2);
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    expect([...container.querySelectorAll('*')].filter((el) => /overflow-x-(auto|scroll)/.test(el.getAttribute('class') || ''))).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: /^Togli il filtro Collana Le cronache/ }));
+    expect(titles()).toHaveLength(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Collana' })).getByRole('button', { name: /Le cronache di Narnia/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Azzera tutto' }));
+    expect(titles()).toHaveLength(3);
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+
+  it('senza libri con collana il foglio Filtri non mostra la sezione Collana', async () => {
+    server();
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await screen.findByRole('group', { name: 'Genere' });
+    expect(screen.queryByRole('group', { name: 'Collana' })).not.toBeInTheDocument();
+  });
+
   it('Gestione chiede conferma e poi rilegge i generi', async () => {
     const calls = server({ 'POST /api/books/classify': { books: [{ ...BOOKS[0], genres: ['Classici'] }], changed: 1 } });
     open('/libreria');
