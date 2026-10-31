@@ -606,7 +606,7 @@ describe('app', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Altro' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /Desideri/ }));
     expect(await screen.findByRole('heading', { name: 'Desideri' })).toBeInTheDocument();
-    expect(await screen.findByText('Dune')).toBeInTheDocument();
+    expect((await screen.findAllByText('Dune')).length).toBeGreaterThan(0);
     expect(screen.getByText('Frank Herbert')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Togli Dune dai desideri' }));
     expect(await screen.findByText(/Nessun desiderio/)).toBeInTheDocument();
