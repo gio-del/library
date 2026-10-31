@@ -1,15 +1,15 @@
-import { Camera, CircleCheck, CircleX, Search } from 'lucide-react';
+import { Camera, CircleCheck, CircleX, Heart, Search } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { looksLikeIsbn } from '../lib/isbn';
 import { cn } from '../lib/cn';
-import type { Book } from '../lib/types';
+import type { Book, WishItem } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useScanner } from '../hooks/useScanner';
 import { Button, Cover, Input, Msg } from '../components/ui';
 
-interface Verdict { yes: boolean; book: Partial<Book>; text: string }
+interface Verdict { yes: boolean; wish?: boolean; book: Partial<Book>; text: string }
 
 const buzz = (p: number | number[]) => { if (navigator.vibrate) navigator.vibrate(p); };
 
@@ -25,8 +25,8 @@ export function Scan() {
   const seq = useRef(0);
   const say = (t: string, e = false) => { setMsg(t); setErr(e); };
 
-  const show = (yes: boolean, book: Partial<Book>) =>
-    setVerdict({ yes, book, text: yes ? 'Ce l’hai già' : book.isbn ? 'Non ce l’hai: lo aggiungo?' : 'Non ce l’hai' });
+  const show = (yes: boolean, book: Partial<Book>, wish = false) =>
+    setVerdict({ yes, wish, book, text: yes ? 'Ce l’hai già' : wish ? 'È nei tuoi desideri' : book.isbn ? 'Non ce l’hai: lo aggiungo?' : 'Non ce l’hai' });
 
   async function checkIsbn(isbn: string) {
     const my = ++seq.current;
@@ -43,8 +43,11 @@ export function Scan() {
       if ((e as { status?: number }).status !== 404) { setVerdict(null); say((e as Error).message, true); return; }
       say('');
       const norm = isbn.replace(/[\s-]/g, '');
-      show(false, { isbn: norm });
+      const wished = await api<WishItem[]>('GET', '/api/wishlist').then((l) => l.find((w) => w.isbn === norm), () => undefined);
+      if (my !== seq.current) return;
       buzz([80, 60, 80]);
+      if (wished) { show(false, wished, true); return; }
+      show(false, { isbn: norm });
       api<Partial<Book>>('GET', `/api/lookup/${encodeURIComponent(norm)}`).then((f) => { if (my === seq.current && f.title) show(false, f); }).catch(() => {});
     }
   }
@@ -86,6 +89,17 @@ export function Scan() {
     setSaving(false);
   }
 
+  async function wishFor() {
+    if (saving || !verdict?.book.isbn) return;
+    setSaving(true);
+    try {
+      const r = await api<{ item: WishItem; status: string }>('POST', '/api/wishlist', { isbn: verdict.book.isbn });
+      setVerdict({ yes: false, wish: true, book: r.item, text: r.status === 'saved' ? 'Messo nei desideri' : 'È nei tuoi desideri' });
+      say('');
+    } catch (e) { say((e as Error).message, true); }
+    setSaving(false);
+  }
+
   const book = verdict?.book;
   const Icon = verdict?.yes ? CircleCheck : CircleX;
   return (
@@ -104,16 +118,17 @@ export function Scan() {
       {verdict && book && (
         <article aria-live="polite" className={cn('rounded-2xl p-4 text-white shadow', verdict.yes ? 'bg-ok' : 'bg-ko')}>
           <h2 className="m-0 flex items-center gap-2 text-2xl font-bold"><Icon aria-hidden className="size-7 shrink-0" />{verdict.text}</h2>
-          {(book.title || (book.authors || []).length > 0 || (verdict.yes && book.cover)) && (
+          {(book.title || (book.authors || []).length > 0 || ((verdict.yes || verdict.wish) && book.cover)) && (
             <div className="mt-3 flex items-center gap-3">
-              {verdict.yes && book.cover && <Cover book={book} className="w-16 shrink-0" />}
+              {(verdict.yes || verdict.wish) && book.cover && <Cover book={book} className="w-16 shrink-0" />}
               <div className="min-w-0 [overflow-wrap:anywhere]">
                 <p className="m-0 font-semibold">{book.title}</p>
                 <p className="m-0 text-white/90">{(book.authors || []).join(', ')}</p>
               </div>
             </div>
           )}
-          {!verdict.yes && book.isbn && <Button variant="soft" className="mt-3 w-full" disabled={saving} onClick={() => void add()}>Aggiungi alla libreria</Button>}
+          {!verdict.yes && book.isbn && <Button variant="soft" className="mt-3 w-full" disabled={saving} onClick={() => void add()}>{verdict.wish ? 'L’ho comprato' : 'Aggiungi alla libreria'}</Button>}
+          {!verdict.yes && !verdict.wish && book.isbn && <Button variant="ghost" className="mt-2 w-full" disabled={saving} onClick={() => void wishFor()}><Heart aria-hidden className="size-5" />Metti nei desideri</Button>}
           {verdict.yes && book.isbn && <Button variant="soft" className="mt-3 w-full" onClick={() => nav(`/libro/${book.isbn}`)}>Apri scheda</Button>}
         </article>
       )}

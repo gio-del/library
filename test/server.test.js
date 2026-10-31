@@ -544,3 +544,30 @@ test('lettura copertina: una alla volta, la seconda in parallelo riceve 429', as
   assert.strictEqual(b.status, 429);
   assert.strictEqual((await read()).status, 200);
 });
+
+test('desideri: sessione, doppioni, 409 se in libreria, rimozione e acquisto', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  for (const [m, p] of [['GET', '/api/wishlist'], ['POST', '/api/wishlist'], ['DELETE', '/api/wishlist/9780306406157']]) {
+    assert.strictEqual((await call(m, p, m === 'POST' ? { isbn: '9780306406157' } : undefined)).status, 401, `${m} ${p}`);
+  }
+  const c = await login();
+  assert.deepStrictEqual(await (await call('GET', '/api/wishlist', undefined, c)).json(), []);
+  assert.strictEqual((await call('POST', '/api/wishlist', { isbn: '123' }, c)).status, 400);
+  const r = await call('POST', '/api/wishlist', { isbn: '978-0-306-40615-7' }, c);
+  assert.strictEqual(r.status, 201);
+  const { item } = await r.json();
+  assert.strictEqual(item.title, 'Titolo <b>');
+  assert.strictEqual(item.cover, '9780306406157.jpg');
+  assert.strictEqual((await call('POST', '/api/wishlist', { isbn: '9780306406157' }, c)).status, 200);
+  assert.strictEqual((await (await call('GET', '/api/wishlist', undefined, c)).json()).length, 1);
+  assert.ok(fs.existsSync(path.join(dataDir, 'wishlist.json')));
+  // comprato: entra in libreria e esce dai desideri, la copertina resta
+  assert.strictEqual((await call('POST', '/api/books', { isbn: '9780306406157' }, c)).status, 201);
+  assert.deepStrictEqual(await (await call('GET', '/api/wishlist', undefined, c)).json(), []);
+  assert.ok(fs.existsSync(path.join(dataDir, 'covers', '9780306406157.jpg')));
+  assert.strictEqual((await call('POST', '/api/wishlist', { isbn: '9780306406157' }, c)).status, 409);
+  // rimozione: la copertina va via solo se il libro non è in libreria
+  assert.strictEqual((await call('POST', '/api/wishlist', { isbn: '9780804429573' }, c)).status, 201);
+  assert.strictEqual((await call('DELETE', '/api/wishlist/9780804429573', undefined, c)).status, 200);
+  assert.strictEqual((await call('DELETE', '/api/wishlist/9780804429573', undefined, c)).status, 404);
+});

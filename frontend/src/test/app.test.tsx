@@ -570,4 +570,54 @@ describe('app', () => {
       r.unmount();
     }
   });
+  it.each([360, 390])('desideri a %i px: dalla scansione, rimozione e passaggio in libreria, anche toccando di continuo', async (w) => {
+    window.innerWidth = w;
+    const NEW = { isbn: '9780804429573', title: 'Dune', authors: ['Frank Herbert'], cover: null };
+    let wish: typeof NEW[] = [];
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const m = init?.method || 'GET';
+      calls.push(`${m} ${url}`);
+      const ok = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      if (url === '/api/auth/status') return ok({ authenticated: true });
+      if (url === '/api/books' && m === 'GET') return ok(BOOKS);
+      if (url === `/api/books/${NEW.isbn}`) return ok({ error: 'Non trovato' }, 404);
+      if (url === `/api/lookup/${NEW.isbn}`) return ok(NEW);
+      if (url === '/api/wishlist' && m === 'GET') return ok(wish);
+      if (url === '/api/wishlist' && m === 'POST') { await new Promise((r) => setTimeout(r, 50)); wish = [NEW]; return ok({ status: 'saved', item: NEW }, 201); }
+      if (url === `/api/wishlist/${NEW.isbn}` && m === 'DELETE') { wish = []; return ok({ ok: true }); }
+      if (url === '/api/books' && m === 'POST') { wish = []; return ok({ status: 'saved', book: NEW }, 201); }
+      return ok({ error: 'Non trovato' }, 404);
+    }));
+    open('/scansiona');
+    const box = await screen.findByRole('textbox', { name: 'ISBN, titolo o autore' });
+    await userEvent.type(box, `${NEW.isbn}{Enter}`);
+    expect(await screen.findByText('Non ce l’hai: lo aggiungo?')).toBeInTheDocument();
+    const put = screen.getByRole('button', { name: 'Metti nei desideri' });
+    await userEvent.dblClick(put);
+    expect(await screen.findByText('Messo nei desideri')).toBeInTheDocument();
+    expect(calls.filter((c) => c === 'POST /api/wishlist')).toHaveLength(1);
+    // riscansionando, il verdetto lo dice
+    await userEvent.clear(box);
+    await userEvent.type(box, `${NEW.isbn}{Enter}`);
+    expect(await screen.findByText('È nei tuoi desideri')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Metti nei desideri' })).not.toBeInTheDocument();
+    // Gestione > Desideri: rimuovere
+    await userEvent.click(screen.getByRole('button', { name: 'Altro' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Desideri/ }));
+    expect(await screen.findByRole('heading', { name: 'Desideri' })).toBeInTheDocument();
+    expect(await screen.findByText('Dune')).toBeInTheDocument();
+    expect(screen.getByText('Frank Herbert')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Togli Dune dai desideri' }));
+    expect(await screen.findByText(/Nessun desiderio/)).toBeInTheDocument();
+    // spostare in libreria
+    wish = [NEW];
+    await userEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Altro' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Desideri/ }));
+    const bought = await screen.findByRole('button', { name: 'L’ho comprato' });
+    await userEvent.dblClick(bought);
+    expect(await screen.findByText(/Nessun desiderio/)).toBeInTheDocument();
+    expect(calls.filter((c) => c === 'POST /api/books')).toHaveLength(1);
+  });
 });
