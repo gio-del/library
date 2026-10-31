@@ -10,6 +10,7 @@ import { Scan } from './screens/Scan';
 import { ManualForm } from './screens/ManualForm';
 import { Notes } from './screens/Notes';
 import { Stats } from './screens/Stats';
+import { Wishlist } from './screens/Wishlist';
 
 export function App() {
   const { status } = useAuth();
@@ -26,6 +27,7 @@ export function App() {
           </Route>
           <Route path="/scansiona/manuale" element={<ManualForm />} />
           <Route path="/statistiche" element={<Stats />} />
+          <Route path="/desideri" element={<Wishlist />} />
           <Route path="/libro/:isbn" element={<BookDetail />} />
           <Route path="*" element={<Navigate to="/libreria" replace />} />
         </Routes>

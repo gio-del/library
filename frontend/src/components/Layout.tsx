@@ -1,5 +1,5 @@
 import { Dialog, DropdownMenu } from 'radix-ui';
-import { ChartNoAxesColumn, Download, EllipsisVertical, X, Library, LogOut, NotebookPen, RefreshCw, ScanBarcode, Tags, Upload, type LucideIcon } from 'lucide-react';
+import { ChartNoAxesColumn, Download, EllipsisVertical, Heart, X, Library, LogOut, NotebookPen, RefreshCw, ScanBarcode, Tags, Upload, type LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -104,6 +104,7 @@ export function TopBar() {
           <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-60 rounded-xl bg-paper p-1.5 shadow-xl">
             <DropdownMenu.Label className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">Gestione</DropdownMenu.Label>
             <DropdownMenu.Item className={item} asChild><Link to="/statistiche"><ChartNoAxesColumn aria-hidden className="size-5 text-plum" />Statistiche</Link></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><Link to="/desideri"><Heart aria-hidden className="size-5 text-plum" />Desideri</Link></DropdownMenu.Item>
             <DropdownMenu.Item className={item} onSelect={() => setAsk('classify')}><Tags aria-hidden className="size-5 text-plum" />Rileggi i generi</DropdownMenu.Item>
             <DropdownMenu.Item className={item} onSelect={() => setAsk('retry')}><RefreshCw aria-hidden className="size-5 text-plum" />Cerca di nuovo i dati{missing > 0 && <span className="ml-auto rounded-full bg-gold px-2 text-xs font-semibold text-plum">{missing}</span>}</DropdownMenu.Item>
             <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=json" download><Download aria-hidden className="size-5 text-plum" />Esporta (JSON)</a></DropdownMenu.Item>

@@ -31,3 +31,11 @@ export interface Candidate {
   language: string;
   source: string;
 }
+
+export interface WishItem {
+  isbn: string;
+  title?: string;
+  authors: string[];
+  cover?: string | null;
+  added?: string;
+}

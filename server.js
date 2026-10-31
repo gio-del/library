@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { normalize } = require('./lib/isbn');
 const { createStore } = require('./lib/store');
 const { createNotes, MAX_TEXT } = require('./lib/notes');
+const { createWishlist } = require('./lib/wishlist');
 const { createGoal, isValid: validGoal } = require('./lib/goal');
 const { createAuth } = require('./lib/auth');
 const { lookup, fetchCover } = require('./lib/lookup');
@@ -51,6 +52,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
   const store = createStore(config.dataDir);
   const notes = createNotes(config.dataDir);
   const goal = createGoal(config.dataDir);
+  const wishlist = createWishlist(config.dataDir);
   const auth = createAuth({ user: config.user, password: config.password, now });
   const coversDir = path.join(config.dataDir, 'covers');
   const coverReader = config.claudeBin ? createCoverReader({ bin: config.claudeBin, timeoutMs: config.claudeTimeoutMs }) : null;
@@ -127,7 +129,20 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     const book = { isbn, title: '', authors: [], publisher: '', year: '', cover: null, genres: classify([]), read: false, added: new Date(now()).toISOString() };
     await fillBook(book);
     if (!(await store.add(book))) return { status: 200, body: { status: 'exists', book: await store.get(isbn) } };
+    await wishlist.remove(isbn); // comprato: non è più un desiderio (la copertina resta al libro)
     return { status: 201, body: { status: 'saved', book } };
+  }
+
+  async function addWish(isbn) {
+    if (await store.get(isbn)) return { status: 409, body: { error: 'Ce l’hai già in libreria' } };
+    const have = await wishlist.get(isbn);
+    if (have) return { status: 200, body: { status: 'exists', item: have } };
+    const item = { isbn, title: '', authors: [], cover: null, added: new Date(now()).toISOString() };
+    await fillBook(item);
+    const { title, authors, cover } = item;
+    const wish = { isbn, title, authors, cover, added: item.added };
+    if (!(await wishlist.add(wish))) return { status: 200, body: { status: 'exists', item: await wishlist.get(isbn) } };
+    return { status: 201, body: { status: 'saved', item: wish } };
   }
 
   // Riprova la ricerca di un libro salvato senza dati o senza copertina.
@@ -227,6 +242,21 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const b = await readJson(req);
       if (!validGoal(b.goal)) return send(res, 400, { error: 'L’obiettivo è un numero intero da 1 a 999' });
       return send(res, 200, await goal.put(b.goal));
+    }
+    if (p === '/api/wishlist' && req.method === 'GET') return send(res, 200, await wishlist.list());
+    if (p === '/api/wishlist' && req.method === 'POST') {
+      const isbn = normalize((await readJson(req)).isbn);
+      if (!isbn) return send(res, 400, { error: 'ISBN non valido' });
+      const r = await addWish(isbn);
+      return send(res, r.status, r.body);
+    }
+    const wd = /^\/api\/wishlist\/([\d-]{10,17}|\d{9}X)$/.exec(p);
+    if (req.method === 'DELETE' && wd) {
+      const isbn = normalize(wd[1]);
+      const gone = isbn && (await wishlist.remove(isbn));
+      if (!gone) return send(res, 404, { error: 'Non trovato' });
+      if (gone.cover && !(await store.get(isbn))) await fsp.rm(path.join(coversDir, gone.cover), { force: true });
+      return send(res, 200, { ok: true });
     }
     if (req.method === 'GET' && p === '/api/books') {
       const q = (url.searchParams.get('q') || '').slice(0, 100);
