@@ -22,6 +22,8 @@ Poi apri `http://127.0.0.1:8080`. Per la fotocamera il browser vuole HTTPS (mett
 | `CLAUDE_BIN` | spenta | percorso di Claude Code (`claude`): attiva «Leggi i dati dalla foto». Senza, `POST /api/cover-read` risponde 404 e l’interfaccia non mostra il pulsante |
 | `CLAUDE_TIMEOUT_MS` | `60000` | tempo massimo di una lettura |
 
+A ogni salvataggio la versione precedente resta in `DATA_DIR/books.json.bak`; se `books.json` si rovina, il server riparte dal `.bak` (con un avviso nel log), e per ripristinare a mano basta copiare il `.bak` su `books.json`.
+
 ### Leggere i dati dalla foto della copertina
 
 Funzione facoltativa, spenta di default. Per attivarla: installa Claude Code, fai il login (`claude`, una volta) **con l’utente che fa girare il server** e imposta `CLAUDE_BIN` con il percorso dell’eseguibile. Il server lancia, senza shell, `claude -p --model haiku --strict-mcp-config --tools Read --allowedTools Read --output-format json` in una cartella temporanea propria della richiesta (cancellata sempre), senza strumenti web, una lettura alla volta (le altre ricevono 429). Titolo, autori, editore e lingua letti dalla copertina compilano solo i campi vuoti, marcati «dalla foto»; non si salva nulla finché non premi «Salva».
