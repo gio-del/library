@@ -24,7 +24,7 @@ test('scrittura atomica: nessun file temporaneo e scritture concorrenti intere',
   const dir = tmp();
   const s = createStore(dir);
   await Promise.all(Array.from({ length: 20 }, (_, i) => s.add({ isbn: String(i) })));
-  assert.deepStrictEqual(fs.readdirSync(dir), ['books.json']);
+  assert.deepStrictEqual(fs.readdirSync(dir).sort(), ['books.json', 'books.json.bak']);
   assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'books.json'), 'utf8')).length, 20);
 });
 
