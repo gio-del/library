@@ -45,3 +45,48 @@ test('migrazione: «Altro» e «Senza genere» spariscono dai generi, il resto r
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'books.json'), 'utf8'))[0].genres, []);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('books.json.bak: copia a ogni salvataggio, permesso 0600', async () => {
+  const dir = tmp();
+  const s = createStore(dir);
+  await s.add({ isbn: '1' });
+  await s.add({ isbn: '2' });
+  const bak = path.join(dir, 'books.json.bak');
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(bak, 'utf8')), [{ isbn: '1' }]);
+  assert.strictEqual(fs.statSync(bak).mode & 0o777, 0o600);
+  await s.replace({ isbn: '2', x: 1 });
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(bak, 'utf8')), [{ isbn: '1' }, { isbn: '2' }]);
+  await s.remove('1');
+  assert.strictEqual(JSON.parse(fs.readFileSync(bak, 'utf8')).length, 2);
+});
+
+test('books.json rovinato con .bak valido: si riparte dal .bak', async () => {
+  for (const bad of ['{"isbn":', '{"a":1}', '']) {
+    const dir = tmp();
+    await createStore(dir).add({ isbn: '1' });
+    await createStore(dir).add({ isbn: '2' });
+    fs.writeFileSync(path.join(dir, 'books.json'), bad);
+    const s = createStore(dir);
+    assert.deepStrictEqual(await s.list(), [{ isbn: '1' }]);
+    await s.add({ isbn: '3' });
+    assert.strictEqual((await createStore(dir).list()).length, 2);
+    // il .bak buono non è stato sostituito dalla copia rovinata
+    assert.doesNotThrow(() => JSON.parse(fs.readFileSync(path.join(dir, 'books.json.bak'), 'utf8')));
+  }
+});
+
+test('books.json e .bak rovinati: load() lancia ancora l’errore', async () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'books.json'), '{rotto');
+  fs.writeFileSync(path.join(dir, 'books.json.bak'), 'nope');
+  await assert.rejects(createStore(dir).list(), SyntaxError);
+  const d2 = tmp();
+  fs.writeFileSync(path.join(d2, 'books.json'), '{rotto');
+  await assert.rejects(createStore(d2).list(), SyntaxError);
+});
+
+test('primo avvio: lista vuota, nessun errore, nessun .bak', async () => {
+  const dir = tmp();
+  assert.deepStrictEqual(await createStore(dir).list(), []);
+  assert.ok(!fs.existsSync(path.join(dir, 'books.json.bak')));
+});

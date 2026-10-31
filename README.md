@@ -17,10 +17,13 @@ Poi apri `http://127.0.0.1:8080`. Per la fotocamera il browser vuole HTTPS (mett
 | `LISTEN_HOST` | `127.0.0.1` | indirizzo di ascolto (mai `0.0.0.0` di default) |
 | `PORT` | `8080` | porta |
 | `DATA_DIR` | `./data` | `books.json`, `covers/` e, se vuoi, `logo.png` o `logo.jpg` (il tuo logo nella schermata di accesso; senza, l’emblema dell’app) |
+
 | `AUTH_USER` | `library` | utente del login |
 | `AUTH_PASSWORD` / `AUTH_PASSWORD_FILE` | obbligatoria | password, o file che la contiene; senza, il server non parte |
 | `CLAUDE_BIN` | spenta | percorso di Claude Code (`claude`): attiva «Leggi i dati dalla foto». Senza, `POST /api/cover-read` risponde 404 e l’interfaccia non mostra il pulsante |
 | `CLAUDE_TIMEOUT_MS` | `60000` | tempo massimo di una lettura |
+
+A ogni salvataggio la versione precedente resta in `DATA_DIR/books.json.bak`; se `books.json` si rovina, il server riparte dal `.bak` (con un avviso nel log), e per ripristinare a mano basta copiare il `.bak` su `books.json`.
 
 ### Leggere i dati dalla foto della copertina
 
