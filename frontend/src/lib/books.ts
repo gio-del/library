@@ -2,6 +2,11 @@ import type { Book } from './types';
 
 export const hasIsbn = (b: Book) => /^\d{13}$/.test(b.isbn);
 export const needsRetry = (b: Book) => hasIsbn(b) && (b.lookup === 'failed' || !b.cover);
+// Ricerca su Amazon: per ISBN-13, altrimenti (codice manuale) per titolo e autori. Solo testo pubblico del libro.
+export function amazonSearchUrl(item: { isbn: string; title?: string; authors?: string[] }): string {
+  const q = /^\d{13}$/.test(item.isbn) ? item.isbn : [item.title, ...(item.authors || [])].filter(Boolean).join(' ') || item.isbn;
+  return `https://www.amazon.it/s?k=${encodeURIComponent(q)}`;
+}
 export const bookTitle = (b: Book) => b.title || (hasIsbn(b) ? b.isbn : 'Senza titolo');
 
 // I generi che il server sa assegnare (lib/genres.js); la scheda del libro li offre per la correzione a mano.

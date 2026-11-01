@@ -620,4 +620,29 @@ describe('app', () => {
     expect(await screen.findByText(/Nessun desiderio/)).toBeInTheDocument();
     expect(calls.filter((c) => c === 'POST /api/books')).toHaveLength(1);
   });
+
+  it('desideri a 360 px: il link ad Amazon ha href, target e rel giusti', async () => {
+    window.innerWidth = 360;
+    const wish = [
+      { isbn: '9780804429573', title: 'Dune', authors: ['Frank Herbert'], cover: null },
+      { isbn: 'm42', title: 'Libro & co', authors: ['A B'], cover: null },
+    ];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const ok = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      if (url === '/api/auth/status') return ok({ authenticated: true });
+      if (url === '/api/books') return ok(BOOKS);
+      if (url === '/api/wishlist') return ok(wish);
+      return ok({ error: 'Non trovato' }, 404);
+    }));
+    open('/desideri');
+    const links = await screen.findAllByRole('link', { name: /su Amazon/ });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute('href', 'https://www.amazon.it/s?k=9780804429573');
+    expect(links[1]).toHaveAttribute('href', 'https://www.amazon.it/s?k=Libro%20%26%20co%20A%20B');
+    for (const l of links) {
+      expect(l).toHaveAttribute('target', '_blank');
+      expect(l).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(l.className).toContain('min-h-11');
+    }
+  });
 });

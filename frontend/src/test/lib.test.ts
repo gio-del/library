@@ -1,4 +1,4 @@
-import { bookGenres, filterBooks, genreCounts, libraryStats, needsRetry, seriesCounts, sortBooks } from '../lib/books';
+import { amazonSearchUrl, bookGenres, filterBooks, genreCounts, libraryStats, needsRetry, seriesCounts, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -97,5 +97,14 @@ describe('libraryStats', () => {
   });
   it('con libreria vuota non fallisce', () => {
     expect(libraryStats([], now)).toMatchObject({ total: 0, read: 0, toRead: 0, genres: [] });
+  });
+});
+
+describe('amazonSearchUrl', () => {
+  it('con ISBN-13 cerca per ISBN', () => {
+    expect(amazonSearchUrl({ isbn: '9780804429573', title: 'Dune', authors: ['F'] })).toBe('https://www.amazon.it/s?k=9780804429573');
+  });
+  it('con codice manuale cerca per titolo e autori, codificati', () => {
+    expect(amazonSearchUrl({ isbn: 'm123', title: 'Il nome & la rosa', authors: ['Umberto Eco'] })).toBe('https://www.amazon.it/s?k=Il%20nome%20%26%20la%20rosa%20Umberto%20Eco');
   });
 });
