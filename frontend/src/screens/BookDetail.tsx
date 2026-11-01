@@ -36,6 +36,19 @@ function rows(b: Book): [string, string][] {
   return all.filter(([, v]) => v).map(([k, v]) => [k, String(v)]);
 }
 
+const SOURCE_NAMES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'il catalogo SBN' };
+
+// Distingue «la fonte non ha l'ISBN» da «la fonte non ha risposto» (errore o timeout).
+function failedText(sources?: Record<string, string>): string {
+  const all = Object.keys(sources || {});
+  const down = all.filter((k) => sources![k] === 'error');
+  const next = 'Usa Modifica per inserire titolo e autore, o cercali online per titolo.';
+  if (!down.length) return `Nessuna fonte ha questo ISBN. ${next}`;
+  if (down.length === all.length) return `Nessuna fonte ha risposto: riprova più tardi. ${next}`;
+  const who = down.map((k) => SOURCE_NAMES[k] || k).join(' e ');
+  return `${who.charAt(0).toUpperCase()}${who.slice(1)} non ha risposto: riprova più tardi. Le altre fonti non hanno questo ISBN. ${next}`;
+}
+
 export function BookDetail() {
   const { isbn = '' } = useParams();
   const nav = useNavigate();
@@ -123,11 +136,11 @@ export function BookDetail() {
       setSearching(true);
       setLookupMsg(null);
       try {
-        const r = await api<{ book: Book }>('POST', `/api/books/${isbn}/lookup`);
+        const r = await api<{ book: Book; sources?: Record<string, string> }>('POST', `/api/books/${isbn}/lookup`);
         upsert(r.book);
         // l'esito resta sulla scheda finché non si cerca di nuovo: il toast da solo spariva troppo presto
         setLookupMsg(r.book.lookup === 'failed'
-          ? { text: 'Nessuna fonte ha questo ISBN. Usa Modifica per inserire titolo e autore, o cercali online per titolo.', error: true }
+          ? { text: failedText(r.sources), error: true }
           : { text: r.book.cover ? 'Dati trovati' : 'Dati trovati, ma la copertina non c\u2019è ancora' });
       } catch (e) { setLookupMsg({ text: (e as Error).message, error: true }); } finally { setSearching(false); }
     });
