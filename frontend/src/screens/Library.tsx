@@ -10,6 +10,7 @@ import { LetterRail, type RailGroup } from '../components/LetterRail';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
 const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
+const DEFAULT_ORDER: SortOrder = 'author';
 
 const MIN_RAIL = 12;
 
@@ -19,14 +20,14 @@ export function Library() {
   const [genre, setGenre] = useState('');
   const [series, setSeries] = useState('');
   const [minRating, setMinRating] = useState(0);
-  const [order, setOrder] = useState<SortOrder>('recent');
+  const [order, setOrder] = useState<SortOrder>(DEFAULT_ORDER);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
   const { key } = useLocation();
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
-  useEffect(() => { setState('all'); setGenre(''); setSeries(''); setMinRating(0); setQuery(''); setOrder('recent'); }, [key]);
+  useEffect(() => { setState('all'); setGenre(''); setSeries(''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); }, [key]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
 
@@ -44,7 +45,7 @@ export function Library() {
   const genres = genreCounts(searched, state, genre);
   const seriesList = seriesCounts(searched, state, series);
   const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
-  const active = state !== 'all' || genre !== '' || series !== '' || minRating > 0 || q !== '' || order !== 'recent';
+  const active = state !== 'all' || genre !== '' || series !== '' || minRating > 0 || q !== '' || order !== DEFAULT_ORDER;
 
   let status = '';
   if (err) status = err;
@@ -123,7 +124,7 @@ export function Library() {
             </div>
           </>
         )}
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setMinRating(0); setQuery(''); setOrder('recent'); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );
