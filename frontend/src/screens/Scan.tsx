@@ -3,19 +3,20 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { looksLikeIsbn } from '../lib/isbn';
+import { findOtherEdition } from '../lib/books';
 import { cn } from '../lib/cn';
 import type { Book, WishItem } from '../lib/types';
 import { useBooks } from '../state/books';
 import { useScanner } from '../hooks/useScanner';
 import { Button, Cover, Input, Msg } from '../components/ui';
 
-interface Verdict { yes: boolean; wish?: boolean; book: Partial<Book>; text: string }
+interface Verdict { yes: boolean; wish?: boolean; book: Partial<Book>; text: string; other?: Book }
 
 const buzz = (p: number | number[]) => { if (navigator.vibrate) navigator.vibrate(p); };
 
 export function Scan() {
   const nav = useNavigate();
-  const { upsert } = useBooks();
+  const { books, upsert } = useBooks();
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -48,7 +49,11 @@ export function Scan() {
       buzz([80, 60, 80]);
       if (wished) { show(false, wished, true); return; }
       show(false, { isbn: norm });
-      api<Partial<Book>>('GET', `/api/lookup/${encodeURIComponent(norm)}`).then((f) => { if (my === seq.current && f.title) show(false, f); }).catch(() => {});
+      api<Partial<Book>>('GET', `/api/lookup/${encodeURIComponent(norm)}`).then((f) => { if (my !== seq.current || !f.title) return;
+        const other = findOtherEdition(books, f);
+        if (other) setVerdict({ yes: false, book: f, other, text: `Hai già un’altra edizione: ${other.title} (ISBN ${other.isbn})` });
+        else show(false, f);
+      }).catch(() => {});
     }
   }
 
@@ -127,7 +132,8 @@ export function Scan() {
               </div>
             </div>
           )}
-          {!verdict.yes && book.isbn && <Button variant="soft" className="mt-3 w-full" disabled={saving} onClick={() => void add()}>{verdict.wish ? 'L’ho comprato' : 'Aggiungi alla libreria'}</Button>}
+          {!verdict.yes && book.isbn && <Button variant="soft" className="mt-3 w-full" disabled={saving} onClick={() => void add()}>{verdict.wish ? 'L’ho comprato' : verdict.other ? 'Aggiungi comunque' : 'Aggiungi alla libreria'}</Button>}
+          {verdict.other && <Button variant="soft" className="mt-2 w-full" onClick={() => nav(`/libro/${verdict.other!.isbn}`)}>Apri quello che hai</Button>}
           {!verdict.yes && !verdict.wish && book.isbn && <Button variant="ghost" className="mt-2 w-full" disabled={saving} onClick={() => void wishFor()}><Heart aria-hidden className="size-5" />Metti nei desideri</Button>}
           {verdict.yes && book.isbn && <Button variant="soft" className="mt-3 w-full" onClick={() => nav(`/libro/${book.isbn}`)}>Apri scheda</Button>}
         </article>

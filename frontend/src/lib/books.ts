@@ -50,6 +50,20 @@ export function filterBooks(books: Book[], f: ReadFilter, genre: string): Book[]
 export const ratingOf = (b: Book) => (b.read && Number.isInteger(b.rating) && b.rating! >= 1 && b.rating! <= 5 ? b.rating! : 0);
 export const todayIso = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// Chiave di confronto: minuscole, senza accenti né punteggiatura, spazi ridotti.
+const workKey = (s: string | undefined) => norm(s || '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/** Stesso titolo normalizzato e stesso primo autore (entrambi presenti). */
+export function sameWork(a: Partial<Book>, b: Partial<Book>): boolean {
+  const ta = workKey(a.title), tb = workKey(b.title);
+  const aa = workKey((a.authors || []).find(Boolean)), ab = workKey((b.authors || []).find(Boolean));
+  return !!ta && ta === tb && !!aa && aa === ab;
+}
+
+/** Un libro già in libreria con un altro ISBN che è la stessa opera del candidato. */
+export const findOtherEdition = (books: Book[], candidate: Partial<Book>): Book | undefined =>
+  books.find((b) => b.isbn !== candidate.isbn && sameWork(b, candidate));
+
 export type SortOrder = 'recent' | 'title' | 'author' | 'rating';
 export const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
