@@ -183,3 +183,13 @@ test('Google Books: nessun risultato, 429 o risposta malformata non rompono la r
   assert.deepStrictEqual(await run(json({}, 429)), [null, 'error']);
   assert.deepStrictEqual(await run(timeout), [null, 'error']);
 });
+
+test('fonte che trova il libro senza autore: l\'autore arriva da un\'altra fonte', async () => {
+  const r = await lookup(ISBN, fake({ ol: json({ title: 'T', publish_date: '2001' }), sbn: () => json(sbnRec) }));
+  assert.deepStrictEqual([r.title, r.authors, r.source], ['T', ['Jane Austen'], 'openlibrary']);
+});
+
+test('nessuna fonte ha l\'autore: il libro resta senza, nessuna eccezione', async () => {
+  const r = await lookup(ISBN, fake({ ol: json({ title: 'T' }), sbn: timeout }));
+  assert.deepStrictEqual([r.title, r.authors], ['T', []]);
+});
