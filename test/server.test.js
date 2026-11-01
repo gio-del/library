@@ -435,7 +435,7 @@ test('export JSON e CSV: sessione richiesta, allegato; import aggiunge e non sov
   await call('POST', '/api/books', { manual: true, title: 'Mio libro', authors: ['Ada'] }, cookie);
   const j = await call('GET', '/api/books/export?format=json', undefined, cookie);
   assert.match(j.headers.get('content-disposition'), /^attachment; filename="libreria-.*\.json"$/);
-  const exported = JSON.parse(await j.text());
+  const exported = JSON.parse(await j.text()).books;
   assert.strictEqual(exported[0].title, 'Mio libro');
   const c = await call('GET', '/api/books/export?format=csv', undefined, cookie);
   assert.match(c.headers.get('content-disposition'), /\.csv"$/);
@@ -444,12 +444,37 @@ test('export JSON e CSV: sessione richiesta, allegato; import aggiunge e non sov
 
   const incoming = [{ ...exported[0], title: 'Cambiato' }, { isbn: '9780306406157', title: 'Nuovo', authors: ['Z'] }, { isbn: 'zz' }];
   const r = await call('POST', '/api/books/import', incoming, cookie);
-  assert.deepStrictEqual(await r.json(), { added: 1, skipped: 1, invalid: 1 });
+  assert.deepStrictEqual(await r.json(), { added: 1, skipped: 1, invalid: 1, wishlistAdded: 0 });
   const all = await (await call('GET', '/api/books', undefined, cookie)).json();
   assert.strictEqual(all.length, 2);
   assert.strictEqual(all.find((b) => b.isbn === exported[0].isbn).title, 'Mio libro');
   const again = await (await call('POST', '/api/books/import', incoming, cookie)).json();
   assert.strictEqual(again.added, 0);
+});
+
+test('export e import dei desideri: nuovo formato, vecchio formato, doppioni e voci non valide', async (t) => {
+  const { call, login } = await start(t);
+  const cookie = await login();
+  const wish = { isbn: '9780306406157', title: 'Da comprare', authors: ['Ada'], cover: null, added: '2026-10-01T10:00:00.000Z' };
+  const own = { isbn: '9780141439518', title: 'Già mio', authors: ['B'] };
+  const body = { books: [own], wishlist: [wish, { ...wish, title: 'doppione nel file' }, { isbn: '9780141439518', title: 'Già in libreria' }, { isbn: 'zz' }, 5] };
+  const r = await (await call('POST', '/api/books/import', body, cookie)).json();
+  assert.deepStrictEqual(r, { added: 1, skipped: 0, invalid: 2, wishlistAdded: 1 });
+  const list = await (await call('GET', '/api/wishlist', undefined, cookie)).json();
+  assert.strictEqual(list.length, 1);
+  assert.strictEqual(list[0].title, 'Da comprare');
+  assert.strictEqual(list[0].added, wish.added);
+  // non sovrascrive un desiderio già presente
+  const again = await (await call('POST', '/api/books/import', { books: [], wishlist: [{ ...wish, title: 'Cambiato' }] }, cookie)).json();
+  assert.strictEqual(again.wishlistAdded, 0);
+  assert.strictEqual((await (await call('GET', '/api/wishlist', undefined, cookie)).json())[0].title, 'Da comprare');
+  // l'export JSON li contiene, il CSV no
+  const exp = JSON.parse(await (await call('GET', '/api/books/export?format=json', undefined, cookie)).text());
+  assert.deepStrictEqual(exp.wishlist.map((w) => [w.isbn, w.title, w.authors, w.cover, w.added]), [[wish.isbn, 'Da comprare', ['Ada'], null, wish.added]]);
+  assert.doesNotMatch(await (await call('GET', '/api/books/export?format=csv', undefined, cookie)).text(), /Da comprare/);
+  // vecchi formati: lista e {books}
+  assert.strictEqual((await (await call('POST', '/api/books/import', [{ isbn: '9780747532743', title: 'Vecchio' }], cookie)).json()).wishlistAdded, 0);
+  assert.strictEqual((await (await call('POST', '/api/books/import', { books: [] }, cookie)).json()).wishlistAdded, 0);
 });
 
 test('import: JSON malformato 400, corpo troppo grande 413', async (t) => {
