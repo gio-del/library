@@ -51,6 +51,10 @@ describe('sortBooks', () => {
     const l = [b({ isbn: 'a' }), b({ isbn: 'b', added: '2026-01-01' }), b({ isbn: 'c', added: '2026-03-01' })];
     expect(ids(sortBooks(l, 'recent'))).toEqual(['c', 'b', 'a']);
   });
+  it('autore: per cognome, anche con particelle e forma «Cognome, Nome»', () => {
+    const l = [b({ isbn: 't', authors: ['Anna Todd'] }), b({ isbn: 'a', authors: ['Jane Austen'] }), b({ isbn: 'b', authors: ['Frances Eliza Burnett'] }), b({ isbn: 'd', authors: ['Edmondo De Amicis'] }), b({ isbn: 'e', authors: ['Umberto Eco'] }), b({ isbn: 'm', authors: ['Gabriel García Márquez'] }), b({ isbn: 'c', authors: ['Calvino, Italo'] }), b({ isbn: 'x', authors: ['Omero'] })];
+    expect(ids(sortBooks(l, 'author'))).toEqual(['a', 'b', 'c', 'd', 'e', 'm', 'x', 't']);
+  });
   it('titolo e autore ignorano accenti e maiuscole, i mancanti vanno in fondo', () => {
     const l = [b({ isbn: 'a', title: 'zeta', authors: ['Zed'] }), b({ isbn: 'n' }), b({ isbn: 'e', title: 'Èco', authors: ['Eco'] }), b({ isbn: 'd', title: 'dune', authors: ['Álvaro'] })];
     expect(ids(sortBooks(l, 'title'))).toEqual(['d', 'e', 'a', 'n']);
