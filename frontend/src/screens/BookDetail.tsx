@@ -51,6 +51,8 @@ export function BookDetail() {
   const [cat, setCat] = useState<string[]>([]);
   const [coverV, setCoverV] = useState(0);
   const [askDelete, setAskDelete] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [lookupMsg, setLookupMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const lock = useLock();
   const { coverRead } = useAuth();
   const [fromPhoto, setFromPhoto] = useState<string[]>([]);
@@ -118,12 +120,16 @@ export function BookDetail() {
 
   async function again() {
     await lock('again', async () => {
-      toast('Cerco…');
+      setSearching(true);
+      setLookupMsg(null);
       try {
         const r = await api<{ book: Book }>('POST', `/api/books/${isbn}/lookup`);
         upsert(r.book);
-        toast(r.book.lookup === 'failed' ? 'Dati ancora non trovati' : r.book.cover ? 'Trovato' : 'Copertina ancora non trovata');
-      } catch (e) { toast((e as Error).message, true); }
+        // l'esito resta sulla scheda finché non si cerca di nuovo: il toast da solo spariva troppo presto
+        setLookupMsg(r.book.lookup === 'failed'
+          ? { text: 'Nessuna fonte ha questo ISBN. Usa Modifica per inserire titolo e autore, o cercali online per titolo.', error: true }
+          : { text: r.book.cover ? 'Dati trovati' : 'Dati trovati, ma la copertina non c\u2019è ancora' });
+      } catch (e) { setLookupMsg({ text: (e as Error).message, error: true }); } finally { setSearching(false); }
     });
   }
 
@@ -196,7 +202,8 @@ export function BookDetail() {
             <Input id="read-at" type="date" max={todayIso()} disabled={busy} value={book.readAt || ''} onChange={(e) => void patch({ readAt: e.target.value || null }, '')} />
           </div>
         )}
-        {needsRetry(book) && <Button variant="ghost" onClick={() => void again()}>Cerca di nuovo i dati</Button>}
+        {needsRetry(book) && <Button variant="ghost" disabled={searching} aria-busy={searching} onClick={() => void again()}>{searching ? 'Cerco…' : 'Cerca di nuovo i dati'}</Button>}
+        {lookupMsg && <Msg text={lookupMsg.text} error={lookupMsg.error} />}
         <CoverPicker onPick={(f) => void changeCover(f)} />
         <div className="flex gap-2">
           <button type="button" className={tool} onClick={startEdit}><Pencil aria-hidden className="size-5" />Modifica</button>
