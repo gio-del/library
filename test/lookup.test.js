@@ -89,7 +89,7 @@ test('«Cerca di nuovo» aggiorna un libro fallito; senza login 401; ISBN ignoto
   let r = await call('POST', `/api/books/${ISBN}/lookup`, undefined, c);
   const first = await r.json();
   assert.strictEqual(first.book.lookup, 'failed');
-  assert.deepStrictEqual(first.sources, { openlibrary: 'notfound', sbn: 'error' });
+  assert.deepStrictEqual(first.sources, { openlibrary: 'notfound', sbn: 'error', googlebooks: 'notfound' });
 
   sbnUp = true;
   r = await call('POST', '/api/books/lookup-failed', undefined, c);
