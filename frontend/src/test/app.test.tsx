@@ -54,14 +54,14 @@ describe('app', () => {
   it('il titolo riporta alla Libreria e azzera ricerca e filtri', async () => {
     server();
     open('/libreria');
-    const search = await screen.findByRole('searchbox', { name: 'Cerca per titolo o autore' });
+    const search = await screen.findByRole('searchbox', { name: 'Cerca nella libreria' });
     await userEvent.type(search, 'narnia');
     expect(search).toHaveValue('narnia');
     await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
-    expect(screen.getByRole('searchbox', { name: 'Cerca per titolo o autore' })).toHaveValue('');
+    expect(screen.getByRole('searchbox', { name: 'Cerca nella libreria' })).toHaveValue('');
     await userEvent.click(screen.getByRole('link', { name: 'Note' }));
     await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
-    expect(await screen.findByRole('searchbox', { name: 'Cerca per titolo o autore' })).toBeInTheDocument();
+    expect(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' })).toBeInTheDocument();
   });
 
   it('il logo apre un dialogo, che si chiude con X, Esc e tocco fuori', async () => {
@@ -144,6 +144,22 @@ describe('app', () => {
     expect(screen.getByText('Narnia')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
     expect(screen.getByText('Mansfield Park')).toBeInTheDocument();
+  });
+
+  it('la ricerca copre le note, si combina con i filtri e dice quando non trova nulla', async () => {
+    server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Sapiens', authors: ['Harari'], notes: 'Copertina blu, perché no', cover: 'c.jpg' }] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Cerca nella libreria' }), '  PERCHE ');
+    expect(screen.getByText('Sapiens')).toBeInTheDocument();
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Togli il filtro Testo PERCHE' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
+    expect(screen.queryByText('Sapiens')).not.toBeInTheDocument();
+    expect(screen.getByText('Nessun libro corrisponde ai filtri.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Testo PERCHE' }));
+    expect(screen.getByText('Narnia')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toHaveValue('');
   });
 
   it('il foglio Filtri sceglie il genere, mostra il puntino e si azzera', async () => {

@@ -1,16 +1,14 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { bookGenres, bookTitle, genreCounts, matchRead, norm, ratingOf, seriesCounts, seriesOf, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
+import { bookGenres, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesOf, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
-import type { Book } from '../lib/types';
 import { useBooks } from '../state/books';
 import { Badge, Cover, Input, Msg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
 const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
-const matchText = (b: Book, q: string) => !q || norm([b.title, ...b.authors, b.series].filter(Boolean).join(' ')).includes(q);
 
 export function Library() {
   const { books, loaded, load } = useBooks();
@@ -31,7 +29,7 @@ export function Library() {
 
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
-  const searched = useMemo(() => books.filter((b) => matchText(b, q)), [books, q]);
+  const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
   const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesOf(b) === series) && ratingOf(b) >= minRating), order), [searched, state, genre, series, minRating, order]);
   const genres = genreCounts(searched, state, genre);
   const seriesList = seriesCounts(searched, state, series);
@@ -49,7 +47,7 @@ export function Library() {
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-            <Input type="search" aria-label="Cerca per titolo o autore" placeholder="Cerca per titolo o autore" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-10 pr-11 [&::-webkit-search-cancel-button]:hidden" />
+            <Input type="search" aria-label="Cerca nella libreria" placeholder="Cerca nella libreria" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-10 pr-11 [&::-webkit-search-cancel-button]:hidden" />
             {query && <button type="button" aria-label="Cancella la ricerca" onClick={() => setQuery('')} className="absolute right-0 top-0 flex size-12 items-center justify-center text-muted"><X aria-hidden className="size-5" /></button>}
           </div>
           <button type="button" aria-label="Filtri" onClick={() => setOpen(true)} className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-plum-2 text-white">
@@ -62,8 +60,9 @@ export function Library() {
             <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-plum')}>{label} ({count(f)})</button>
           ))}
         </div>
-        {(genre || series || minRating > 0) && (
+        {(genre || series || minRating > 0 || q) && (
           <div data-testid="active-filters" className="mt-2 flex flex-wrap gap-2">
+            {q && <button type="button" onClick={() => setQuery('')} aria-label={`Togli il filtro Testo ${query.trim()}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">Testo {query.trim()}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {series && <button type="button" onClick={() => setSeries('')} aria-label={`Togli il filtro Collana ${series}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">Collana {series}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {minRating > 0 && <button type="button" onClick={() => setMinRating(0)} aria-label={`Togli il filtro Voto minimo ${minRating}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0">Voto minimo {minRating}</span><X aria-hidden className="size-4 shrink-0" /></button>}
@@ -72,7 +71,7 @@ export function Library() {
       </div>
 
       {status && <Msg text={status} error={!!err} />}
-      <p aria-live="polite" className="sr-only">{loaded && shown.length ? `${shown.length} libri` : ''}</p>
+      <p aria-live="polite" className="sr-only">{loaded && shown.length ? `${shown.length} ${shown.length === 1 ? 'libro' : 'libri'}` : ''}</p>
       <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 pt-2 sm:grid-cols-3">
         {shown.map((b) => (
           <li key={b.isbn}>
