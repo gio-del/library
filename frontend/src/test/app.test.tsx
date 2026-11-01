@@ -693,4 +693,22 @@ describe('app', () => {
     expect(msg).toHaveAttribute('role', 'alert');
     expect(screen.getByRole('button', { name: 'Cerca di nuovo i dati' })).toBeEnabled();
   });
+
+  it('«Cerca di nuovo i dati» dice quale fonte non ha risposto, a larghezza telefono', async () => {
+    window.innerWidth = 360;
+    const book = { isbn: '9788817152754', title: '', authors: [], genres: [], cover: null, lookup: 'failed' };
+    server({ 'GET /api/books': [book] });
+    const base = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    let sources: Record<string, string> = { openlibrary: 'error', sbn: 'notfound' };
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => (i?.method === 'POST' ? new Response(JSON.stringify({ book, sources }), { status: 200 }) : base(u, i))));
+    open('/libro/9788817152754');
+    await userEvent.click(await screen.findByRole('button', { name: 'Cerca di nuovo i dati' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Open Library non ha risposto.*cercali online per titolo/);
+    sources = { openlibrary: 'error', sbn: 'error' };
+    await userEvent.click(screen.getByRole('button', { name: 'Cerca di nuovo i dati' }));
+    await screen.findByText(/Nessuna fonte ha risposto/);
+    sources = { openlibrary: 'notfound', sbn: 'notfound' };
+    await userEvent.click(screen.getByRole('button', { name: 'Cerca di nuovo i dati' }));
+    await screen.findByText(/Nessuna fonte ha questo ISBN/);
+  });
 });
