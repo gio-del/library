@@ -1,4 +1,4 @@
-import { amazonSearchUrl, bookGenres, filterBooks, genreCounts, libraryStats, needsRetry, seriesCounts, sortBooks } from '../lib/books';
+import { amazonSearchUrl, bookGenres, filterBooks, genreCounts, libraryStats, matchesQuery, needsRetry, seriesCounts, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -106,5 +106,12 @@ describe('amazonSearchUrl', () => {
   });
   it('con codice manuale cerca per titolo e autori, codificati', () => {
     expect(amazonSearchUrl({ isbn: 'm123', title: 'Il nome & la rosa', authors: ['Umberto Eco'] })).toBe('https://www.amazon.it/s?k=Il%20nome%20%26%20la%20rosa%20Umberto%20Eco');
+  });
+
+  it('matchesQuery cerca in titolo, autori, collana e note senza maiuscole né accenti', () => {
+    const b = { isbn: '1', title: 'Perché leggere', authors: ['Italo Calvino'], series: 'Saggi', notes: 'Copertina blu' } as Book;
+    for (const q of ['', '  ', 'perche', 'CALVINO', 'saggi', 'blu ']) expect(matchesQuery(b, q)).toBe(true);
+    expect(matchesQuery(b, 'rosso')).toBe(false);
+    expect(matchesQuery({ isbn: '2', authors: [] } as Book, 'x')).toBe(false);
   });
 });

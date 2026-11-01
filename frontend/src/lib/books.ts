@@ -54,6 +54,12 @@ export type SortOrder = 'recent' | 'title' | 'author' | 'rating';
 export const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // Solo per la lista: i libri senza il valore da confrontare vanno in fondo, a parità resta l'ordine di arrivo.
+/** Il testo cercato (già normalizzato con `norm`) compare nel titolo, negli autori, nella collana o nelle note. */
+export const matchesQuery = (b: Book, q: string) => {
+  const needle = norm(q.trim());
+  return !needle || norm([b.title, ...(b.authors || []), b.series, b.notes].filter((x) => typeof x === 'string' && x).join(' ')).includes(needle);
+};
+
 export function sortBooks(books: Book[], order: SortOrder): Book[] {
   const text = (b: Book) => norm((order === 'title' ? b.title : b.authors.find(Boolean)) || '').trim();
   return [...books].sort((a, b) => {
