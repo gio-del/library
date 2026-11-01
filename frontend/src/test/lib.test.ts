@@ -1,4 +1,4 @@
-import { amazonSearchUrl, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, sortBooks } from '../lib/books';
+import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -134,5 +134,23 @@ describe('groupStarts', () => {
   it('per recenti raggruppa per mese', () => {
     const list = sortBooks([b('1', 'A', ['X'], '2026-03-05'), b('2', 'B', ['X'], '2026-03-01'), b('3', 'C', ['X'], '2026-01-09')], 'recent');
     expect(groupStarts(list, 'recent').map((g) => g.isbn)).toEqual(['1', '3']);
+  });
+});
+
+describe('sameWork / findOtherEdition', () => {
+  const a = b({ isbn: '1', title: 'Il Nome della Rosa!', authors: ['Umberto Eco'] });
+  it('ignora maiuscole, accenti e punteggiatura', () => {
+    expect(sameWork(a, b({ isbn: '2', title: 'il nome della rosa', authors: ['umberto eco'] }))).toBe(true);
+    expect(sameWork(b({ title: 'Perché?', authors: ['X'] }), b({ title: 'PERCHE', authors: ['x'] }))).toBe(true);
+  });
+  it('autori diversi, mancanti o titolo vuoto: no', () => {
+    expect(sameWork(a, b({ title: 'Il nome della rosa', authors: ['Altro Autore'] }))).toBe(false);
+    expect(sameWork(b({ title: 'T', authors: [] }), b({ title: 'T', authors: [] }))).toBe(false);
+    expect(sameWork(b({ title: '', authors: ['A'] }), b({ title: '', authors: ['A'] }))).toBe(false);
+  });
+  it('trova un altro ISBN, non lo stesso', () => {
+    const t = b({ isbn: '2', title: 'il nome della rosa', authors: ['Umberto Eco'] });
+    expect(findOtherEdition([a], t)?.isbn).toBe('1');
+    expect(findOtherEdition([a], { ...t, isbn: '1' })).toBeUndefined();
   });
 });

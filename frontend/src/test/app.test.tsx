@@ -648,6 +648,56 @@ describe('app', () => {
     expect(calls.filter((c) => c === 'POST /api/books')).toHaveLength(1);
   });
 
+  it.each([360, 390])('altra edizione a %i px: avviso, Aggiungi comunque una volta sola, Apri quello che hai', async (w) => {
+    window.innerWidth = w;
+    const NEW = { isbn: '9780804429573', title: 'MANSFIELD park', authors: ['Jane Austen'], cover: null };
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const m = init?.method || 'GET';
+      calls.push(`${m} ${url}`);
+      const ok = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      if (url === '/api/auth/status') return ok({ authenticated: true });
+      if (url === '/api/books' && m === 'GET') return ok(BOOKS);
+      if (url === `/api/books/${NEW.isbn}`) return ok({ error: 'Non trovato' }, 404);
+      if (url === `/api/lookup/${NEW.isbn}`) return ok(NEW);
+      if (url === '/api/wishlist') return ok([]);
+      if (url === '/api/books' && m === 'POST') return ok({ status: 'saved', book: NEW }, 201);
+      return ok({ error: 'Non trovato' }, 404);
+    }));
+    open('/scansiona');
+    const box = await screen.findByRole('textbox', { name: 'ISBN, titolo o autore' });
+    await userEvent.type(box, `${NEW.isbn}{Enter}`);
+    expect(await screen.findByText('Hai già un’altra edizione: Mansfield Park (ISBN 9780306406157)')).toBeInTheDocument();
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Aggiungi comunque' }));
+    expect(await screen.findByText('Aggiunto alla libreria')).toBeInTheDocument();
+    expect(calls.filter((c) => c === 'POST /api/books')).toHaveLength(1);
+  });
+
+  it('altra edizione: Apri quello che hai porta alla scheda; titolo uguale con altro autore non avvisa', async () => {
+    window.innerWidth = 360;
+    let lookup: unknown = { isbn: '9780804429573', title: 'Mansfield Park', authors: ['Altra Persona'], cover: null };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const ok = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      if (url === '/api/auth/status') return ok({ authenticated: true });
+      if (url === '/api/books') return ok(BOOKS);
+      if (url === '/api/books/9780804429573') return ok({ error: 'Non trovato' }, 404);
+      if (url === '/api/lookup/9780804429573') return ok(lookup);
+      if (url === '/api/wishlist') return ok([]);
+      return ok({ error: 'Non trovato' }, 404);
+    }));
+    open('/scansiona');
+    const box = await screen.findByRole('textbox', { name: 'ISBN, titolo o autore' });
+    await userEvent.type(box, '9780804429573{Enter}');
+    expect(await screen.findByRole('button', { name: 'Aggiungi alla libreria' })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText(/altra edizione/)).not.toBeInTheDocument();
+    lookup = { isbn: '9780804429573', title: 'Mansfield Park', authors: ['Jane Austen'], cover: null };
+    await userEvent.clear(box);
+    await userEvent.type(box, '9780804429573{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: 'Apri quello che hai' }));
+    expect(screen.queryByRole('button', { name: 'Apri quello che hai' })).not.toBeInTheDocument();
+  });
+
   it('desideri a 360 px: il link ad Amazon ha href, target e rel giusti', async () => {
     window.innerWidth = 360;
     const wish = [
