@@ -53,7 +53,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
   const notes = createNotes(config.dataDir);
   const goal = createGoal(config.dataDir);
   const wishlist = createWishlist(config.dataDir);
-  const auth = createAuth({ user: config.user, password: config.password, now });
+  const auth = createAuth({ user: config.user, password: config.password, now, dataDir: config.dataDir });
   const coversDir = path.join(config.dataDir, 'covers');
   const coverReader = config.claudeBin ? createCoverReader({ bin: config.claudeBin, timeoutMs: config.claudeTimeoutMs }) : null;
   const publicDir = path.join(__dirname, 'public');
