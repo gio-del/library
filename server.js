@@ -269,7 +269,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const all = await store.list();
       const day = new Date(now()).toISOString().slice(0, 10);
       const disposition = { 'content-disposition': `attachment; filename="libreria-${day}.${format}"` };
-      if (format === 'json') return send(res, 200, JSON.stringify(all, null, 2) + '\n', { ...disposition, 'content-type': 'application/json; charset=utf-8' });
+      if (format === 'json') return send(res, 200, JSON.stringify({ books: all, wishlist: await wishlist.list() }, null, 2) + '\n', { ...disposition, 'content-type': 'application/json; charset=utf-8' });
       return send(res, 200, toCsv(all), { ...disposition, 'content-type': 'text/csv; charset=utf-8' });
     }
     if (req.method === 'POST' && p === '/api/books/import') {
@@ -277,7 +277,9 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       if (r.error) return send(res, 400, { error: r.error });
       let added = 0;
       for (const b of r.books) if (await store.add(b)) added++;
-      return send(res, 200, { added, skipped: r.books.length - added, invalid: r.invalid });
+      let wishlistAdded = 0;
+      for (const w of r.wishlist) if (!(await store.get(w.isbn)) && (await wishlist.add(w))) wishlistAdded++;
+      return send(res, 200, { added, skipped: r.books.length - added, invalid: r.invalid, wishlistAdded });
     }
     if (req.method === 'POST' && p === '/api/books') {
       const body = await readJson(req);

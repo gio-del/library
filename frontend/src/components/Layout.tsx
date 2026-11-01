@@ -55,9 +55,9 @@ export function TopBar() {
       try {
         let data: unknown;
         try { data = JSON.parse(await file.text()); } catch { throw new Error('Il file non è un JSON valido'); }
-        const r = await api<{ added: number; skipped: number; invalid: number }>('POST', '/api/books/import', data);
+        const r = await api<{ added: number; skipped: number; invalid: number; wishlistAdded?: number }>('POST', '/api/books/import', data);
         await load();
-        toast(`Aggiunti ${r.added} libri, saltati ${r.skipped}${r.invalid ? `, non validi ${r.invalid}` : ''}`);
+        toast(`Aggiunti ${r.added} libri, saltati ${r.skipped}${r.wishlistAdded ? `, ${r.wishlistAdded} ${r.wishlistAdded === 1 ? 'desiderio' : 'desideri'}` : ''}${r.invalid ? `, non validi ${r.invalid}` : ''}`);
       } catch (e) { toast((e as Error).message, true); }
     });
   }

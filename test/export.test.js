@@ -45,3 +45,15 @@ test('import: voto e data di lettura validi restano, gli altri si scartano', () 
   assert.ok(!('rating' in r.books[1]) && !('readAt' in r.books[1]));
   assert.match(toCsv([{ isbn: '9780306406157', title: 'T', authors: [], rating: 3, readAt: '2026-03-01' }]), /3,2026-03-01/);
 });
+
+test('import: desideri validi, non validi e troppi', () => {
+  const r = parseImport(JSON.stringify({ books: [], wishlist: [{ isbn: '978-0-306-40615-7', title: ' T ', authors: ['A'], cover: 'x.jpg' }, { isbn: 'zz' }, { isbn: '9780306406157' }] }));
+  assert.strictEqual(r.wishlist.length, 1);
+  assert.strictEqual(r.wishlist[0].isbn, '9780306406157');
+  assert.strictEqual(r.wishlist[0].title, 'T');
+  assert.strictEqual(r.wishlist[0].cover, null);
+  assert.strictEqual(r.invalid, 1);
+  assert.deepStrictEqual(parseImport('[]').wishlist, []);
+  assert.deepStrictEqual(parseImport('{"books":[]}').wishlist, []);
+  assert.ok(parseImport(JSON.stringify({ books: [], wishlist: new Array(5001).fill({}) })).error);
+});
