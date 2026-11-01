@@ -205,11 +205,18 @@ describe('app', () => {
     open('/libreria');
     await screen.findByText('Mansfield Park');
     const titles = () => screen.getAllByRole('link', { name: /Mansfield|Narnia|Àlbum/ }).map((a) => a.textContent);
+    expect(titles()[0]).toContain('Mansfield');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    let group = await screen.findByRole('group', { name: 'Ordina per' });
+    expect(within(group).getAllByRole('button')).toHaveLength(4);
+    expect(within(group).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Azzera tutto' })).toBeDisabled();
+    await userEvent.click(within(group).getByRole('button', { name: 'Aggiunti di recente' }));
+    expect(screen.getByRole('button', { name: 'Azzera tutto' })).toBeEnabled();
+    await userEvent.keyboard('{Escape}');
     expect(titles()[0]).toContain('Àlbum');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
-    const group = await screen.findByRole('group', { name: 'Ordina per' });
-    expect(within(group).getAllByRole('button')).toHaveLength(4);
-    expect(within(group).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
+    group = await screen.findByRole('group', { name: 'Ordina per' });
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     expect(within(group).getByRole('button', { name: 'Titolo A→Z' })).toHaveAttribute('aria-pressed', 'true');
@@ -217,9 +224,9 @@ describe('app', () => {
     await userEvent.click(within(group).getByRole('button', { name: 'Voto' }));
     expect(within(group).getByRole('button', { name: 'Voto' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Azzera tutto' }));
-    expect(titles()[0]).toContain('Àlbum');
+    expect(titles()[0]).toContain('Mansfield');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
-    expect(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Aggiunti di recente' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('il foglio Filtri ordina per voto e filtra per voto minimo con chip', async () => {
@@ -778,6 +785,7 @@ describe('scorrimento a lettere', () => {
     window.scrollTo = scroll as unknown as typeof window.scrollTo;
     open('/libreria');
     await screen.findByText('A libro');
+    await sortBy('Aggiunti di recente');
     expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument(); // «recenti», un solo mese
     await sortBy('Autore A→Z');
     const rail = await screen.findByTestId('letter-rail');
