@@ -672,4 +672,25 @@ describe('app', () => {
       expect(l.className).toContain('min-h-11');
     }
   });
+
+  it('«Cerca di nuovo i dati» su un ISBN non trovato lascia un messaggio che resta', async () => {
+    const book = { isbn: '9788817152754', title: '', authors: [], genres: [], cover: '9788817152754.jpg', lookup: 'failed' };
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    server({ 'GET /api/books': [book] });
+    const base = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      if (i?.method === 'POST') { await gate; return new Response(JSON.stringify({ book }), { status: 200 }); }
+      return base(u, i);
+    }));
+    open('/libro/9788817152754');
+    const btn = await screen.findByRole('button', { name: 'Cerca di nuovo i dati' });
+    await userEvent.click(btn);
+    const busy = await screen.findByRole('button', { name: 'Cerco…' });
+    expect(busy).toBeDisabled();
+    release();
+    const msg = await screen.findByText(/Nessuna fonte ha questo ISBN/);
+    expect(msg).toHaveAttribute('role', 'alert');
+    expect(screen.getByRole('button', { name: 'Cerca di nuovo i dati' })).toBeEnabled();
+  });
 });
