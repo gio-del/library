@@ -1,4 +1,4 @@
-import { amazonSearchUrl, bookGenres, filterBooks, genreCounts, libraryStats, matchesQuery, needsRetry, seriesCounts, sortBooks } from '../lib/books';
+import { amazonSearchUrl, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -117,5 +117,22 @@ describe('amazonSearchUrl', () => {
     for (const q of ['', '  ', 'perche', 'CALVINO', 'saggi', 'blu ']) expect(matchesQuery(b, q)).toBe(true);
     expect(matchesQuery(b, 'rosso')).toBe(false);
     expect(matchesQuery({ isbn: '2', authors: [] } as Book, 'x')).toBe(false);
+  });
+});
+
+describe('groupStarts', () => {
+  const b = (isbn: string, title: string, authors: string[], added = '2026-01-01'): Book => ({ isbn, title, authors, added });
+  it('per autore usa il cognome, senza accenti; senza autore va sotto #', () => {
+    const list = sortBooks([b('1', 'A', ['Anna Todd']), b('2', 'B', ['Èco Umberto']), b('3', 'C', ['Rebecca Yarros']), b('4', 'D', []), b('5', 'E', ['Jane Austen'])], 'author');
+    expect(groupStarts(list, 'author')).toEqual([{ label: 'A', isbn: '5' }, { label: 'T', isbn: '1' }, { label: 'U', isbn: '2' }, { label: 'Y', isbn: '3' }, { label: '#', isbn: '4' }]);
+  });
+  it('per titolo usa l’iniziale, per voto non c’è scorrimento', () => {
+    const list = sortBooks([b('1', 'Narnia', ['X']), b('2', 'Àlbum', ['Y']), b('3', 'Dune', ['Z'])], 'title');
+    expect(groupStarts(list, 'title').map((g) => g.label)).toEqual(['A', 'D', 'N']);
+    expect(groupStarts(list, 'rating')).toEqual([]);
+  });
+  it('per recenti raggruppa per mese', () => {
+    const list = sortBooks([b('1', 'A', ['X'], '2026-03-05'), b('2', 'B', ['X'], '2026-03-01'), b('3', 'C', ['X'], '2026-01-09')], 'recent');
+    expect(groupStarts(list, 'recent').map((g) => g.isbn)).toEqual(['1', '3']);
   });
 });

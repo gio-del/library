@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
@@ -710,5 +710,54 @@ describe('app', () => {
     sources = { openlibrary: 'notfound', sbn: 'notfound' };
     await userEvent.click(screen.getByRole('button', { name: 'Cerca di nuovo i dati' }));
     await screen.findByText(/Nessuna fonte ha questo ISBN/);
+  });
+});
+
+describe('scorrimento a lettere', () => {
+  const many = Array.from({ length: 26 }, (_, i) => ({ isbn: `97803064${String(i).padStart(5, '0')}`, title: `Libro ${i}`, authors: [`Nome ${String.fromCharCode(65 + i)}${String.fromCharCode(97 + i)}`], cover: 'a.jpg', added: '2026-01-01' }));
+  const sortBy = async (name: string) => {
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name }));
+    await userEvent.keyboard('{Escape}');
+  };
+
+  it('la striscia muove la lista e mostra la lettera, che sparisce dopo un secondo', async () => {
+    window.innerWidth = 390;
+    server({ 'GET /api/books': many });
+    const scroll = vi.fn();
+    window.scrollTo = scroll as unknown as typeof window.scrollTo;
+    open('/libreria');
+    await screen.findByText('Libro 0');
+    expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument(); // «recenti», un solo mese
+    await sortBy('Autore A→Z');
+    const rail = await screen.findByTestId('letter-rail');
+    expect(screen.queryByTestId('letter-bubble')).not.toBeInTheDocument();
+    fireEvent.pointerDown(rail, { clientY: 0, pointerId: 1 });
+    expect(screen.getByTestId('letter-bubble')).toHaveTextContent('A');
+    fireEvent.pointerMove(rail, { clientY: 9999, buttons: 1, pointerId: 1 });
+    expect(screen.getByTestId('letter-bubble')).toHaveTextContent('Z');
+    expect(rail).toHaveAttribute('aria-valuetext', 'Z');
+    expect(scroll).toHaveBeenCalledTimes(2);
+    fireEvent.pointerMove(rail, { clientY: 9999, buttons: 1, pointerId: 1 }); // stessa lettera: nessun salto in più
+    expect(scroll).toHaveBeenCalledTimes(2);
+    fireEvent.pointerUp(rail, { pointerId: 1 });
+    expect(screen.getByTestId('letter-bubble')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('letter-bubble')).not.toBeInTheDocument(), { timeout: 2000 });
+  });
+
+  it('la tastiera sulla striscia cambia lettera; con una ricerca che lascia pochi libri la striscia sparisce; per voto non c’è', async () => {
+    window.innerWidth = 390;
+    server({ 'GET /api/books': many });
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+    open('/libreria');
+    await screen.findByText('Libro 0');
+    await sortBy('Titolo A→Z');
+    const rail = await screen.findByTestId('letter-rail');
+    expect(rail).toHaveAttribute('aria-valuetext', 'L');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Cerca nella libreria' }), 'libro 1');
+    expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Cerca nella libreria' }));
+    await sortBy('Voto');
+    expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument();
   });
 });
