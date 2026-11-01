@@ -1,14 +1,17 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { bookGenres, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesOf, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
+import { bookGenres, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks } from '../state/books';
 import { Badge, Cover, Input, Msg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
+import { LetterRail, type RailGroup } from '../components/LetterRail';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
 const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
+
+const MIN_RAIL = 12;
 
 export function Library() {
   const { books, loaded, load } = useBooks();
@@ -31,6 +34,13 @@ export function Library() {
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
   const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesOf(b) === series) && ratingOf(b) >= minRating), order), [searched, state, genre, series, minRating, order]);
+  const groups = useMemo(() => groupStarts(shown, order), [shown, order]);
+  const jump = (g: RailGroup) => {
+    const el = document.getElementById(`libro-${g.isbn}`);
+    if (!el) return;
+    const bar = document.querySelector('[data-sticky-bar]')?.getBoundingClientRect().bottom ?? 0;
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - bar - 8 });
+  };
   const genres = genreCounts(searched, state, genre);
   const seriesList = seriesCounts(searched, state, series);
   const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
@@ -74,7 +84,7 @@ export function Library() {
       <p aria-live="polite" className="sr-only">{loaded && shown.length ? `${shown.length} ${shown.length === 1 ? 'libro' : 'libri'}` : ''}</p>
       <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 pt-2 sm:grid-cols-3">
         {shown.map((b) => (
-          <li key={b.isbn}>
+          <li key={b.isbn} id={`libro-${b.isbn}`}>
             <Link to={`/libro/${b.isbn}`} className="relative isolate flex h-full flex-col gap-1.5 rounded-xl bg-paper p-2 shadow-sm">
               <Badge read={b.read} className="absolute left-3.5 top-3.5 z-10 shadow" />
               <Cover book={b}>{bookTitle(b)}</Cover>
@@ -85,6 +95,7 @@ export function Library() {
         ))}
       </ul>
 
+      {groups.length > 1 && shown.length >= MIN_RAIL && <LetterRail groups={groups} letters={order !== 'recent'} onJump={jump} />}
       <Sheet open={open} onOpenChange={setOpen} title="Filtri">
         <p className="mb-2 text-sm font-medium text-muted">Ordina per</p>
         <div role="group" aria-label="Ordina per" className="mb-4 flex flex-col gap-2">

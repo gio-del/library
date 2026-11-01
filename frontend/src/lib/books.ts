@@ -135,3 +135,25 @@ export function libraryStats(books: Book[], now: Date): LibraryStats {
     avgRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
   };
 }
+
+/** Etichetta del gruppo per lo scorrimento a lettere: iniziale della chiave d'ordine, mese per «recenti», `#` per il resto; `null` = niente scorrimento (voto). */
+export function groupLabel(b: Book, order: SortOrder): string | null {
+  if (order === 'rating') return null;
+  if (order === 'recent') {
+    const d = b.added ? new Date(b.added) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('it', { month: 'short', year: 'numeric' }) : '#';
+  }
+  const key = order === 'title' ? norm(b.title || '').trim() : authorSortKey(b.authors.find(Boolean) || '');
+  const c = key.charAt(0).toUpperCase();
+  return /^[A-Z]$/.test(c) ? c : '#';
+}
+
+/** I gruppi nell'ordine in cui compaiono nella lista già ordinata, con il primo libro di ciascuno. */
+export function groupStarts(sorted: Book[], order: SortOrder): { label: string; isbn: string }[] {
+  const out: { label: string; isbn: string }[] = [];
+  for (const b of sorted) {
+    const label = groupLabel(b, order);
+    if (label !== null && out[out.length - 1]?.label !== label) out.push({ label, isbn: b.isbn });
+  }
+  return out;
+}
