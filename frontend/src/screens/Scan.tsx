@@ -1,4 +1,4 @@
-import { Camera, CircleCheck, CircleX, Heart, Search } from 'lucide-react';
+import { Camera, CircleCheck, CircleX, Heart, Search, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -16,7 +16,7 @@ const buzz = (p: number | number[]) => { if (navigator.vibrate) navigator.vibrat
 
 export function Scan() {
   const nav = useNavigate();
-  const { books, loaded, load, upsert } = useBooks();
+  const { books, loaded, load, upsert, remove } = useBooks();
   const booksRef = useRef(books);
   booksRef.current = books;
   useEffect(() => { if (!loaded) void load().catch(() => {}); }, [loaded, load]);
@@ -27,6 +27,12 @@ export function Scan() {
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const seq = useRef(0);
+  const [continuous, setContinuous] = useState(false);
+  const continuousRef = useRef(false);
+  continuousRef.current = continuous;
+  const [added, setAdded] = useState<Book[]>([]);
+  const [count, setCount] = useState(0);
+  const handled = useRef(new Set<string>());
   const say = (t: string, e = false) => { setMsg(t); setErr(e); };
 
   const show = (yes: boolean, book: Partial<Book>, wish = false) =>
@@ -75,7 +81,39 @@ export function Scan() {
     } catch (e) { if (my === seq.current) say((e as Error).message, true); }
   }
 
-  const scanner = useScanner((isbn) => void checkIsbn(isbn), (m) => say(m, true));
+  // Scansione continua: il libro nuovo si aggiunge subito, uno già noto dà solo vibrazione e avviso.
+  async function quickAdd(isbn: string) {
+    if (handled.current.has(isbn)) return;
+    handled.current.add(isbn);
+    try {
+      if (booksRef.current.some((b) => b.isbn === isbn)) { buzz(200); say(`${isbn}: ce l’hai già`); setErr(true); return; }
+      const wished = await api<WishItem[]>('GET', '/api/wishlist').then((l) => l.some((w) => w.isbn === isbn), () => false);
+      if (wished) { buzz(200); say(`${isbn}: è nei tuoi desideri`); setErr(true); return; }
+      const r = await api<{ book: Book; status: string }>('POST', '/api/books', { isbn });
+      upsert(r.book);
+      if (r.status !== 'saved') { buzz(200); say(`${isbn}: ce l’hai già`); setErr(true); return; }
+      setCount((n) => n + 1);
+      setAdded((l) => [r.book, ...l].slice(0, 5));
+      handled.current.add(isbn);
+      say('');
+      buzz(60);
+      return;
+    } catch (e) { say((e as Error).message, true); }
+    handled.current.delete(isbn);
+  }
+
+  async function undo(b: Book) {
+    try {
+      await api('DELETE', `/api/books/${encodeURIComponent(b.isbn)}`);
+      remove(b.isbn);
+      handled.current.delete(b.isbn);
+      setAdded((l) => l.filter((x) => x.isbn !== b.isbn));
+      setCount((n) => n - 1);
+      say('');
+    } catch (e) { say((e as Error).message, true); }
+  }
+
+  const scanner = useScanner((isbn) => { if (continuousRef.current) void quickAdd(isbn); else void checkIsbn(isbn); }, (m) => say(m, true));
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -121,6 +159,22 @@ export function Scan() {
             : <Button key="open" className="w-full" onClick={() => void scanner.start()}>Apri la fotocamera</Button>}
         </div>
       </div>
+      <label className="flex min-h-11 items-center gap-3">
+        <input type="checkbox" role="switch" checked={continuous} className="size-6 accent-plum"
+          onChange={(e) => { setContinuous(e.target.checked); handled.current.clear(); setVerdict(null); setResults([]); say(''); }} />
+        Scansione continua
+      </label>
+      {continuous && count > 0 && <p aria-live="polite" className="m-0 font-semibold">{count} aggiunti</p>}
+      {continuous && added.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {added.map((b) => (
+            <li key={b.isbn} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{b.title || b.isbn}</span>
+              <Button variant="ghost" aria-label={`Annulla ${b.title || b.isbn}`} onClick={() => void undo(b)}><Undo2 aria-hidden className="size-5" />Annulla</Button>
+            </li>
+          ))}
+        </ul>
+      )}
       <Msg text={msg} error={err} />
 
       {verdict && book && (
