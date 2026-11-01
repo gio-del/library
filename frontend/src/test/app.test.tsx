@@ -714,7 +714,7 @@ describe('app', () => {
 });
 
 describe('scorrimento a lettere', () => {
-  const many = Array.from({ length: 26 }, (_, i) => ({ isbn: `97803064${String(i).padStart(5, '0')}`, title: `Libro ${i}`, authors: [`Nome ${String.fromCharCode(65 + i)}${String.fromCharCode(97 + i)}`], cover: 'a.jpg', added: '2026-01-01' }));
+  const many = Array.from({ length: 26 }, (_, i) => ({ isbn: `97803064${String(i).padStart(5, '0')}`, title: `${String.fromCharCode(65 + i)} libro`, authors: [`Nome ${String.fromCharCode(65 + i)}${String.fromCharCode(97 + i)}`], cover: 'a.jpg', added: '2026-01-01' }));
   const sortBy = async (name: string) => {
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     await userEvent.click(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name }));
@@ -727,7 +727,7 @@ describe('scorrimento a lettere', () => {
     const scroll = vi.fn();
     window.scrollTo = scroll as unknown as typeof window.scrollTo;
     open('/libreria');
-    await screen.findByText('Libro 0');
+    await screen.findByText('A libro');
     expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument(); // «recenti», un solo mese
     await sortBy('Autore A→Z');
     const rail = await screen.findByTestId('letter-rail');
@@ -750,11 +750,11 @@ describe('scorrimento a lettere', () => {
     server({ 'GET /api/books': many });
     window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
     open('/libreria');
-    await screen.findByText('Libro 0');
+    await screen.findByText('A libro');
     await sortBy('Titolo A→Z');
     const rail = await screen.findByTestId('letter-rail');
-    expect(rail).toHaveAttribute('aria-valuetext', 'L');
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Cerca nella libreria' }), 'libro 1');
+    expect(rail).toHaveAttribute('aria-valuetext', 'A');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Cerca nella libreria' }), 'z libro');
     expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument();
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Cerca nella libreria' }));
     await sortBy('Voto');
