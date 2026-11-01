@@ -207,13 +207,16 @@ describe('app', () => {
     const titles = () => screen.getAllByRole('link', { name: /Mansfield|Narnia|Àlbum/ }).map((a) => a.textContent);
     expect(titles()[0]).toContain('Mansfield');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
-    const group = await screen.findByRole('group', { name: 'Ordina per' });
+    let group = await screen.findByRole('group', { name: 'Ordina per' });
     expect(within(group).getAllByRole('button')).toHaveLength(4);
     expect(within(group).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Azzera tutto' })).toBeDisabled();
     await userEvent.click(within(group).getByRole('button', { name: 'Aggiunti di recente' }));
-    expect(titles()[0]).toContain('Àlbum');
     expect(screen.getByRole('button', { name: 'Azzera tutto' })).toBeEnabled();
+    await userEvent.keyboard('{Escape}');
+    expect(titles()[0]).toContain('Àlbum');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    group = await screen.findByRole('group', { name: 'Ordina per' });
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     await userEvent.click(within(group).getByRole('button', { name: 'Titolo A→Z' }));
     expect(within(group).getByRole('button', { name: 'Titolo A→Z' })).toHaveAttribute('aria-pressed', 'true');
