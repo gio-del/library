@@ -53,6 +53,15 @@ test('risposta SBN malformata: null, nessuna eccezione', async () => {
   assert.strictEqual(await lookup(ISBN, fake({ ol: notFound(), sbn: new Response('<html>', { status: 200 }) })), null);
 });
 
+test('esito per fonte: trovato, non trovato, errore, risposta malformata', async () => {
+  const run = async (opts) => { const outcomes = {}; await lookup(ISBN, fake(opts), { cover: false, outcomes }); return outcomes; };
+  assert.deepStrictEqual(await run({ ol: notFound(), sbn: json({ numFound: 0, briefRecords: [] }) }), { openlibrary: 'notfound', sbn: 'notfound' });
+  assert.deepStrictEqual(await run({ ol: timeout, sbn: json(sbnRec) }), { openlibrary: 'error', sbn: 'found' });
+  assert.deepStrictEqual(await run({ ol: timeout, sbn: timeout }), { openlibrary: 'error', sbn: 'error' });
+  assert.deepStrictEqual(await run({ ol: notFound(), sbn: new Response('<html>', { status: 200 }) }), { openlibrary: 'notfound', sbn: 'error' });
+  assert.deepStrictEqual(await run({ ol: json({ title: 'T', genres: ['x'] }), sbn: timeout }), { openlibrary: 'found' });
+});
+
 test('la copertina Open Library si prova anche per i risultati SBN', async () => {
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
   const f = (url) => (String(url).includes('covers.openlibrary.org') ? new Response(jpeg) : fake({ ol: notFound(), sbn: json(sbnRec) })(url));
@@ -78,7 +87,9 @@ test('«Cerca di nuovo» aggiorna un libro fallito; senza login 401; ISBN ignoto
   assert.strictEqual((await call('POST', '/api/books/9780306406157/lookup', undefined, c)).status, 404);
 
   let r = await call('POST', `/api/books/${ISBN}/lookup`, undefined, c);
-  assert.strictEqual((await r.json()).book.lookup, 'failed');
+  const first = await r.json();
+  assert.strictEqual(first.book.lookup, 'failed');
+  assert.deepStrictEqual(first.sources, { openlibrary: 'notfound', sbn: 'error' });
 
   sbnUp = true;
   r = await call('POST', '/api/books/lookup-failed', undefined, c);

@@ -112,10 +112,10 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     } catch { /* senza copertina */ }
   }
 
-  async function fillBook(book) {
+  async function fillBook(book, outcomes = {}) {
     delete book.lookup;
     let found = null;
-    try { found = await lookup(book.isbn, fetchFn); } catch { /* trattato come non trovato */ }
+    try { found = await lookup(book.isbn, fetchFn, { outcomes }); } catch { /* trattato come non trovato */ }
     if (!found) { book.lookup = 'failed'; return; }
     Object.assign(book, { title: found.title, authors: found.authors, publisher: found.publisher, year: found.year, source: found.source });
     book.subjects = found.subjects || [];
@@ -150,12 +150,14 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     const old = await store.get(isbn);
     if (!old) return null;
     const book = { ...old };
+    const sources = {};
     if (old.lookup !== 'failed') {
       // dati già presenti: si cerca solo la copertina
       const cover = await fetchCover(old.isbn, fetchFn);
       if (cover) await saveCover(book, cover);
-    } else await fillBook(book);
-    return (await store.replace(book)) || null;
+    } else await fillBook(book, sources);
+    const saved = await store.replace(book);
+    return saved ? { book: saved, sources } : null;
   }
 
   // Rilancia la classificazione sui libri non corretti a mano; cerca i soggetti solo per chi non li ha ancora.
@@ -294,7 +296,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     }
     if (req.method === 'POST' && p === '/api/books/lookup-failed') {
       const out = [];
-      for (const b of await store.list()) if (/^\d{13}$/.test(b.isbn) && (b.lookup === 'failed' || !b.cover)) { const r = await retryBook(b.isbn); if (r) out.push(r); }
+      for (const b of await store.list()) if (/^\d{13}$/.test(b.isbn) && (b.lookup === 'failed' || !b.cover)) { const r = await retryBook(b.isbn); if (r) out.push(r.book); }
       return send(res, 200, { retried: out.length, found: out.filter((b) => b.lookup !== 'failed').length, books: out });
     }
     if (req.method === 'POST' && p === '/api/books/classify') {
@@ -303,8 +305,8 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     }
     const lk = /^\/api\/books\/(\d{13})\/lookup$/.exec(p); // solo con ISBN
     if (req.method === 'POST' && lk) {
-      const book = await retryBook(lk[1]);
-      return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
+      const r = await retryBook(lk[1]);
+      return r ? send(res, 200, r) : send(res, 404, { error: 'Non trovato' });
       }
     if (req.method === 'GET' && p === '/api/search') {
       const title = (url.searchParams.get('title') || '').trim().slice(0, 200);
