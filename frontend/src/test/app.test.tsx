@@ -313,6 +313,17 @@ describe('app', () => {
     expect(calls.filter((c) => c === 'POST /api/books/import').length).toBe(1);
   });
 
+  it('Gestione: dopo l\'importazione dice quanti desideri sono stati aggiunti', async () => {
+    server({ 'POST /api/books/import': { added: 0, skipped: 0, invalid: 0, wishlistAdded: 2 } });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Altro' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Importa/ }));
+    const file = new File([JSON.stringify({ books: [], wishlist: [] })], 'libreria.json', { type: 'application/json' });
+    await userEvent.upload(screen.getByLabelText('File da importare'), file);
+    expect(await screen.findByText('Aggiunti 0 libri, saltati 0, 2 desideri')).toBeInTheDocument();
+  });
+
   it('Gestione apre le Statistiche, con i numeri della Libreria e il ritorno', async () => {
     server();
     open('/libreria');
