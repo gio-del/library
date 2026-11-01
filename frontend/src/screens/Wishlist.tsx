@@ -1,5 +1,6 @@
-import { Trash2 } from 'lucide-react';
+import { ExternalLink, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { amazonSearchUrl } from '../lib/books';
 import { api } from '../lib/api';
 import type { Book, WishItem } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -57,6 +58,7 @@ export function Wishlist() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button disabled={!!busy} onClick={() => void bought(w)}>L’ho comprato</Button>
+                  <a href={amazonSearchUrl(w)} target="_blank" rel="noopener noreferrer" aria-label={`Cerca ${w.title || w.isbn} su Amazon (si apre in una nuova scheda)`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-lilac-soft px-4 font-medium text-plum"><ExternalLink aria-hidden className="size-5" />Cerca su Amazon</a>
                   <Button variant="ghost" disabled={!!busy} aria-label={`Togli ${w.title || w.isbn} dai desideri`} onClick={() => void remove(w)}><Trash2 aria-hidden className="size-5" />Togli</Button>
                 </div>
               </div>
