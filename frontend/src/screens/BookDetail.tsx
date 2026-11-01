@@ -19,7 +19,7 @@ import { useToast } from '../components/Toast';
 import { OnlineSearch, fillEmpty } from '../components/OnlineSearch';
 import { Badge, Button, Field, Input, Msg, Textarea } from '../components/ui';
 
-const SOURCES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'SBN', amazon: 'Amazon' };
+const SOURCES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'SBN', googlebooks: 'Google Books', amazon: 'Amazon' };
 const EDIT = ['title', 'edition', 'publisher', 'year', 'series', 'pages', 'language', 'notes'] as const;
 const LABELS: Record<(typeof EDIT)[number], string> = { title: 'Titolo', edition: 'Edizione', publisher: 'Editore', year: 'Anno', series: 'Collana', pages: 'Pagine', language: 'Lingua', notes: 'Note' };
 const lab = (cat: string[], k: string, label: string) => (cat.includes(k) ? `${label} · da catalogo` : label);
@@ -36,7 +36,7 @@ function rows(b: Book): [string, string][] {
   return all.filter(([, v]) => v).map(([k, v]) => [k, String(v)]);
 }
 
-const SOURCE_NAMES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'il catalogo SBN' };
+const SOURCE_NAMES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'il catalogo SBN', googlebooks: 'Google Books' };
 
 // Distingue «la fonte non ha l'ISBN» da «la fonte non ha risposto» (errore o timeout).
 function failedText(sources?: Record<string, string>): string {

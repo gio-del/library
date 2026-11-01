@@ -5,7 +5,7 @@ import type { Candidate } from '../lib/types';
 import { Sheet } from './Sheet';
 import { Button, Msg } from './ui';
 
-const SOURCES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'SBN' };
+const SOURCES: Record<string, string> = { openlibrary: 'Open Library', sbn: 'SBN', googlebooks: 'Google Books' };
 
 // Riempie solo i campi vuoti del modulo con quelli del candidato; ritorna il nuovo modulo e le chiavi riempite.
 export function fillEmpty(form: Record<string, string>, c: Candidate, keys: string[]): { form: Record<string, string>; filled: string[] } {

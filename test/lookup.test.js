@@ -55,10 +55,10 @@ test('risposta SBN malformata: null, nessuna eccezione', async () => {
 
 test('esito per fonte: trovato, non trovato, errore, risposta malformata', async () => {
   const run = async (opts) => { const outcomes = {}; await lookup(ISBN, fake(opts), { cover: false, outcomes }); return outcomes; };
-  assert.deepStrictEqual(await run({ ol: notFound(), sbn: json({ numFound: 0, briefRecords: [] }) }), { openlibrary: 'notfound', sbn: 'notfound' });
+  assert.deepStrictEqual(await run({ ol: notFound(), sbn: json({ numFound: 0, briefRecords: [] }) }), { openlibrary: 'notfound', sbn: 'notfound', googlebooks: 'notfound' });
   assert.deepStrictEqual(await run({ ol: timeout, sbn: json(sbnRec) }), { openlibrary: 'error', sbn: 'found' });
-  assert.deepStrictEqual(await run({ ol: timeout, sbn: timeout }), { openlibrary: 'error', sbn: 'error' });
-  assert.deepStrictEqual(await run({ ol: notFound(), sbn: new Response('<html>', { status: 200 }) }), { openlibrary: 'notfound', sbn: 'error' });
+  assert.deepStrictEqual(await run({ ol: timeout, sbn: timeout }), { openlibrary: 'error', sbn: 'error', googlebooks: 'notfound' });
+  assert.deepStrictEqual(await run({ ol: notFound(), sbn: new Response('<html>', { status: 200 }) }), { openlibrary: 'notfound', sbn: 'error', googlebooks: 'notfound' });
   assert.deepStrictEqual(await run({ ol: json({ title: 'T', genres: ['x'] }), sbn: timeout }), { openlibrary: 'found' });
 });
 
@@ -162,4 +162,24 @@ test('SBN: record completo non leggibile o Dewey assente: il libro resta, senza 
   const bad = (url) => (String(url).includes('full.json') ? new Response('x', { status: 500 }) : json({ numFound: 1, briefRecords: [{ codiceIdentificativo: 'a b/../c', titolo: 'T' }] }));
   const r = await lookup(ISBN, (url) => (String(url).includes('openlibrary.org/isbn/') ? notFound() : bad(url)));
   assert.deepStrictEqual([r.title, r.dewey, r.subjects], ['T', '', []]);
+});
+
+// Forma della risposta di Google Books (volumes?q=isbn:…) per «Il piccolo Lord»; non registrata dal vivo (429 senza chiave).
+const gbVol = { totalItems: 1, items: [{ volumeInfo: { title: 'Il piccolo Lord', subtitle: 'Edizione integrale', authors: ['Frances Hodgson Burnett'], publisher: 'BUR', publishedDate: '2011-03-03', categories: ['Juvenile Fiction'] } }] };
+const withGb = (gb, base = {}) => (url) => (String(url).includes('googleapis.com') ? (typeof gb === 'function' ? gb() : gb) : fake({ ol: notFound(), sbn: json({ numFound: 0, briefRecords: [] }), ...base })(url));
+
+test('Open Library e SBN senza ISBN → Google Books', async () => {
+  const outcomes = {};
+  const r = await lookup('9788817152754', withGb(json(gbVol)), { cover: false, outcomes });
+  assert.deepStrictEqual([r.title, r.authors, r.publisher, r.year, r.subjects, r.source],
+    ['Il piccolo Lord: Edizione integrale', ['Frances Hodgson Burnett'], 'BUR', '2011', ['Juvenile Fiction'], 'googlebooks']);
+  assert.deepStrictEqual(outcomes, { openlibrary: 'notfound', sbn: 'notfound', googlebooks: 'found' });
+});
+
+test('Google Books: nessun risultato, 429 o risposta malformata non rompono la ricerca', async () => {
+  const run = async (gb) => { const outcomes = {}; const r = await lookup('9788817152754', withGb(gb), { cover: false, outcomes }); return [r, outcomes.googlebooks]; };
+  assert.deepStrictEqual(await run(json({ totalItems: 0 })), [null, 'notfound']);
+  assert.deepStrictEqual(await run(json({ items: [{ volumeInfo: { title: '' } }] })), [null, 'notfound']);
+  assert.deepStrictEqual(await run(json({}, 429)), [null, 'error']);
+  assert.deepStrictEqual(await run(timeout), [null, 'error']);
 });
