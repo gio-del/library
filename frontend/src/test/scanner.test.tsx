@@ -101,3 +101,30 @@ describe('Scansiona senza BarcodeDetector (Safari iOS)', () => {
     expect(await screen.findByText(/non usa la fotocamera: scrivi l’ISBN a mano/)).toBeInTheDocument();
   });
 });
+
+describe('Scansione continua', () => {
+  it('aggiunge senza interazione, una volta sola, e Annulla toglie il libro', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const key = `${init?.method || 'GET'} ${url}`;
+      calls.push(key);
+      if (key === 'GET /api/auth/status') return new Response(JSON.stringify({ authenticated: true }));
+      if (key === 'GET /api/books') return new Response('[]');
+      if (key === 'GET /api/wishlist') return new Response('[]');
+      if (key === 'POST /api/books') return new Response(JSON.stringify({ status: 'saved', book: { isbn: ISBN, title: 'Mansfield Park', authors: [] } }));
+      if (key === `DELETE /api/books/${ISBN}`) return new Response('{}');
+      return new Response(JSON.stringify({ error: 'Non trovato' }), { status: 404 });
+    }));
+    camera();
+    open();
+    await userEvent.click(await screen.findByRole('switch', { name: 'Scansione continua' }));
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Apri la fotocamera' }));
+    expect(await screen.findByText('1 aggiunti')).toBeInTheDocument();
+    await waitFor(() => expect(detect.mock.calls.length).toBeGreaterThan(2), { timeout: 2000 });
+    expect(calls.filter((c) => c === 'POST /api/books')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Chiudi la fotocamera' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla Mansfield Park' }));
+    await waitFor(() => expect(calls).toContain(`DELETE /api/books/${ISBN}`));
+    expect(screen.queryByText('1 aggiunti')).not.toBeInTheDocument();
+  });
+});
