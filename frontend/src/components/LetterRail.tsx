@@ -7,7 +7,7 @@ export interface RailGroup { label: string; isbn: string }
 export function LetterRail({ groups, letters, onJump }: { groups: RailGroup[]; letters: boolean; onJump(g: RailGroup): void }) {
   const [active, setActive] = useState(-1);
   const [bubble, setBubble] = useState(false);
-  const hide = useRef<ReturnType<typeof setTimeout>>();
+  const hide = useRef<ReturnType<typeof setTimeout>>(undefined);
   const last = useRef(-1);
   useEffect(() => () => clearTimeout(hide.current), []);
 
