@@ -24,6 +24,8 @@ Poi apri `http://127.0.0.1:8080`. Per la fotocamera il browser vuole HTTPS (mett
 
 A ogni salvataggio la versione precedente resta in `DATA_DIR/books.json.bak`; se `books.json` si rovina, il server riparte dal `.bak` (con un avviso nel log), e per ripristinare a mano basta copiare il `.bak` su `books.json`.
 
+Al primo salvataggio di ogni giorno il server salva anche lo stato di prima in `DATA_DIR/backups/books-AAAA-MM-GG.json` (permessi 0600) e tiene le ultime 14 copie. Per tornare a un giorno preciso (per esempio dopo una cancellazione per errore scoperta il giorno dopo): ferma il server, scegli la copia con la data voluta e copiala su `DATA_DIR/books.json` (`cp backups/books-2026-11-01.json books.json`), poi riavvia. Un errore nella scrittura della copia viene solo registrato nel log e non blocca il salvataggio.
+
 ### Leggere i dati dalla foto della copertina
 
 Funzione facoltativa, spenta di default. Per attivarla: installa Claude Code, fai il login (`claude`, una volta) **con l’utente che fa girare il server** e imposta `CLAUDE_BIN` con il percorso dell’eseguibile. Il server lancia, senza shell, `claude -p --model haiku --strict-mcp-config --tools Read --allowedTools Read --output-format json` in una cartella temporanea propria della richiesta (cancellata sempre), senza strumenti web, una lettura alla volta (le altre ricevono 429). Titolo, autori, editore e lingua letti dalla copertina compilano solo i campi vuoti, marcati «dalla foto»; non si salva nulla finché non premi «Salva».

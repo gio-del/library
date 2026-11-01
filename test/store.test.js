@@ -24,7 +24,7 @@ test('scrittura atomica: nessun file temporaneo e scritture concorrenti intere',
   const dir = tmp();
   const s = createStore(dir);
   await Promise.all(Array.from({ length: 20 }, (_, i) => s.add({ isbn: String(i) })));
-  assert.deepStrictEqual(fs.readdirSync(dir).sort(), ['books.json', 'books.json.bak']);
+  assert.deepStrictEqual(fs.readdirSync(dir).sort(), ['backups', 'books.json', 'books.json.bak']);
   assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'books.json'), 'utf8')).length, 20);
 });
 
@@ -89,4 +89,51 @@ test('primo avvio: lista vuota, nessun errore, nessun .bak', async () => {
   const dir = tmp();
   assert.deepStrictEqual(await createStore(dir).list(), []);
   assert.ok(!fs.existsSync(path.join(dir, 'books.json.bak')));
+});
+
+const dayFile = (dir, d) => path.join(dir, 'backups', `books-${d}.json`);
+
+test('copia giornaliera: 0600, una sola al giorno, contiene lo stato di inizio giorno', async () => {
+  const dir = tmp();
+  let day = new Date(2026, 0, 5, 10);
+  const s = createStore(dir, { now: () => day });
+  await s.add({ isbn: '1' });
+  const f = dayFile(dir, '2026-01-05');
+  assert.strictEqual(fs.statSync(f).mode & 0o777, 0o600);
+  assert.strictEqual(fs.statSync(path.join(dir, 'backups')).mode & 0o777, 0o700);
+  const first = fs.readFileSync(f, 'utf8');
+  await s.add({ isbn: '2' });
+  await s.remove('1');
+  assert.strictEqual(fs.readFileSync(f, 'utf8'), first);
+  day = new Date(2026, 0, 6, 9);
+  await s.add({ isbn: '3' });
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(dayFile(dir, '2026-01-06'), 'utf8')), [{ isbn: '2' }]);
+});
+
+test('copia giornaliera: restano le ultime 14', async () => {
+  const dir = tmp();
+  let day = new Date(2026, 0, 1, 12);
+  const s = createStore(dir, { now: () => day });
+  for (let i = 0; i < 15; i++) {
+    day = new Date(2026, 0, 1 + i, 12);
+    await s.add({ isbn: String(i) });
+  }
+  const names = fs.readdirSync(path.join(dir, 'backups')).sort();
+  assert.strictEqual(names.length, 14);
+  assert.strictEqual(names[0], 'books-2026-01-02.json');
+  assert.strictEqual(names[13], 'books-2026-01-15.json');
+});
+
+test('copia giornaliera: se la cartella non è scrivibile il salvataggio riesce', async () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'backups'), 'non una cartella');
+  const warn = console.warn;
+  const logs = [];
+  console.warn = (m) => logs.push(m);
+  try {
+    const s = createStore(dir);
+    assert.strictEqual(await s.add({ isbn: '1' }), true);
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'books.json'), 'utf8')).length, 1);
+  } finally { console.warn = warn; }
+  assert.ok(logs.some((m) => /copia giornaliera/.test(m)));
 });
