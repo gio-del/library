@@ -1,5 +1,5 @@
 import { Camera, CircleCheck, CircleX, Heart, Search } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { looksLikeIsbn } from '../lib/isbn';
@@ -16,7 +16,10 @@ const buzz = (p: number | number[]) => { if (navigator.vibrate) navigator.vibrat
 
 export function Scan() {
   const nav = useNavigate();
-  const { books, upsert } = useBooks();
+  const { books, loaded, load, upsert } = useBooks();
+  const booksRef = useRef(books);
+  booksRef.current = books;
+  useEffect(() => { if (!loaded) void load().catch(() => {}); }, [loaded, load]);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -50,7 +53,7 @@ export function Scan() {
       if (wished) { show(false, wished, true); return; }
       show(false, { isbn: norm });
       api<Partial<Book>>('GET', `/api/lookup/${encodeURIComponent(norm)}`).then((f) => { if (my !== seq.current || !f.title) return;
-        const other = findOtherEdition(books, f);
+        const other = findOtherEdition(booksRef.current, f);
         if (other) setVerdict({ yes: false, book: f, other, text: `Hai già un’altra edizione: ${other.title} (ISBN ${other.isbn})` });
         else show(false, f);
       }).catch(() => {});
