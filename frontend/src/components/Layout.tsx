@@ -38,14 +38,13 @@ export function BottomNav() {
   );
 }
 
-type Manage = 'classify';
 
 export function TopBar() {
   const { logout } = useAuth();
   const { load, setAll } = useBooks();
   const { toast } = useToast();
   const lock = useLock();
-  const [ask, setAsk] = useState<Manage | null>(null);
+  const [ask, setAsk] = useState<'classify' | null>(null);
   const complete = useCompleteMissing();
   const [completeOpen, setCompleteOpen] = useState(false);
   const missing = complete.pending;
@@ -65,7 +64,7 @@ export function TopBar() {
     });
   }
 
-  async function run(what: Manage) {
+  async function run() {
     await lock('manage', async () => {
       toast('Rileggo i generi…');
       try {
@@ -113,7 +112,7 @@ export function TopBar() {
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <input ref={fileInput} type="file" accept="application/json,.json" aria-label="File da importare" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void importFile(f); }} />
-      <Confirm open={ask === 'classify'} onOpenChange={(o) => !o && setAsk(null)} title="Rileggere i generi?" action="Rileggi i generi" onConfirm={() => void run('classify')}>
+      <Confirm open={ask === 'classify'} onOpenChange={(o) => !o && setAsk(null)} title="Rileggere i generi?" action="Rileggi i generi" onConfirm={() => void run()}>
         Cerco di nuovo il genere di ogni libro. Quelli che hai corretto a mano non vengono toccati.
       </Confirm>
       <CompleteSheet open={completeOpen} onOpenChange={setCompleteOpen} c={complete} />
