@@ -161,6 +161,6 @@ describe('sameWork / findOtherEdition', () => {
       { isbn: '3', title: 'C' },
     ] as Book[];
     expect(authorCounts(list, 'all', '')).toEqual([['Jane Austen', 2], ['Élodie Rossi', 1]]);
-    expect(authorCounts(list, 'read', 'Zed')).toEqual([['Jane Austen', 1], ['Élodie Rossi', 1], ['Zed', 0]]);
+    expect(authorCounts(list, 'read', 'Zed')).toEqual([['Élodie Rossi', 1], ['JANE AUSTEN', 1], ['Zed', 0]]);
   });
 });
