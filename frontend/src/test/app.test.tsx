@@ -976,7 +976,7 @@ describe('completa i dati mancanti', () => {
       { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], series: 'Arrakis', cover: 'c.jpg' },
     ] });
     open('/libro/9780306406157');
-    await screen.findByRole('heading', { name: 'Il leone' });
+    await screen.findByRole('button', { name: 'Mostra i libri di Lewis' });
     expect(screen.queryByRole('button', { name: 'Vedi la collana' })).not.toBeInTheDocument();
   });
 });
