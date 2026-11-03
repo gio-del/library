@@ -1,4 +1,4 @@
-import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks } from '../lib/books';
+import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -162,5 +162,16 @@ describe('sameWork / findOtherEdition', () => {
     ] as Book[];
     expect(authorCounts(list, 'all', '')).toEqual([['Jane Austen', 2], ['Élodie Rossi', 1]]);
     expect(authorCounts(list, 'read', 'Zed')).toEqual([['Élodie Rossi', 1], ['JANE AUSTEN', 1], ['Zed', 0]]);
+  });
+});
+
+describe('topAuthors', () => {
+  const b = (authors: string[], read = false): Book => ({ isbn: '', title: 't', authors, read } as Book);
+  it('ordina per libri e poi cognome, conta i letti, tace sotto i 2 libri e limita a 5', () => {
+    const books = [b(['Jane Austen'], true), b(['Jane Austen']), b(['Emily Bronte']), b(['emily bronte'], true), b(['Zola']), b(['Zola']), b(['Zola']), b(['Solo'])];
+    expect(topAuthors(books)).toEqual([{ name: 'Zola', books: 3, read: 0 }, { name: 'Jane Austen', books: 2, read: 1 }, { name: 'Emily Bronte', books: 2, read: 1 }]);
+    expect(topAuthors([b(['A']), b(['B'])])).toEqual([]);
+    const many = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((n) => [b([n]), b([n])]);
+    expect(topAuthors(many)).toHaveLength(5);
   });
 });

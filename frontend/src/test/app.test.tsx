@@ -346,6 +346,29 @@ describe('app', () => {
     expect(await screen.findByText('Mansfield Park')).toBeInTheDocument();
   });
 
+  it('Statistiche: gli autori con più libri, il tocco apre la Libreria filtrata', async () => {
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg', read: true },
+      { isbn: '9780306406164', title: 'Emma', authors: ['Jane Austen'], cover: 'b.jpg' },
+      { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], cover: 'c.jpg' },
+    ] });
+    open('/statistiche');
+    expect(await screen.findByRole('heading', { name: 'Autori' })).toBeInTheDocument();
+    expect(screen.getByText('2 libri · 1 letti')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mostra i libri di Herbert' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Mostra i libri di Jane Austen' }));
+    expect(await screen.findByText('Autore Jane Austen')).toBeInTheDocument();
+    expect(screen.queryByText('Dune')).toBeNull();
+  });
+
+  it('Statistiche: senza autori con 2 libri la sezione Autori non compare', async () => {
+    server();
+    open('/statistiche');
+    await screen.findByRole('heading', { name: 'Statistiche' });
+    await screen.findByRole('progressbar', { name: 'Libri letti' });
+    expect(screen.queryByRole('heading', { name: 'Autori' })).toBeNull();
+  });
+
   it('Statistiche con libreria vuota mostra un messaggio', async () => {
     server({ 'GET /api/books': [] });
     open('/statistiche');
