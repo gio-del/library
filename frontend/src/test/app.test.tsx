@@ -953,4 +953,30 @@ describe('completa i dati mancanti', () => {
     expect(screen.getByText('Ancora incompleti: 1')).toBeInTheDocument();
     expect(screen.getByText('Fonte non raggiunta: 0')).toBeInTheDocument();
   });
+
+  it('dalla scheda la riga Collana mostra i letti e apre la Libreria filtrata', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Il leone', authors: ['Lewis'], series: 'Narnia', cover: 'a.jpg', read: true },
+      { isbn: '9780306406164', title: 'Caspian', authors: ['Lewis'], series: ' narnia ', cover: 'b.jpg' },
+      { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], series: 'Arrakis', cover: 'c.jpg' },
+    ] });
+    open('/libro/9780306406157');
+    expect(await screen.findByText('Collana: 2 libri, 1 letti')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Vedi la collana' }));
+    expect(await screen.findByText('Caspian')).toBeInTheDocument();
+    expect(screen.queryByText('Dune')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Togli il filtro Collana Narnia' })).toBeInTheDocument();
+  });
+
+  it('la riga Collana non compare se nessun altro libro ha la stessa collana', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Il leone', authors: ['Lewis'], series: 'Narnia', cover: 'a.jpg' },
+      { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], series: 'Arrakis', cover: 'c.jpg' },
+    ] });
+    open('/libro/9780306406157');
+    await screen.findByRole('heading', { name: 'Il leone' });
+    expect(screen.queryByRole('button', { name: 'Vedi la collana' })).not.toBeInTheDocument();
+  });
 });

@@ -1,7 +1,7 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { authorCounts, bookGenres, hasAuthor, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
+import { authorCounts, bookGenres, hasAuthor, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks } from '../state/books';
 import { Badge, Cover, Input, Msg } from '../components/ui';
@@ -29,7 +29,7 @@ export function Library() {
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
   // Dalla scheda del libro si arriva con l'autore scelto nello stato di navigazione.
-  useEffect(() => { setState('all'); setGenre(''); setSeries(''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
@@ -37,7 +37,7 @@ export function Library() {
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
-  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesOf(b) === series) && (!author || hasAuthor(b, author)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, author, minRating, order]);
+  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!author || hasAuthor(b, author)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, author, minRating, order]);
   const groups = useMemo(() => groupStarts(shown, order), [shown, order]);
   const jump = (g: RailGroup) => {
     const el = document.getElementById(`libro-${g.isbn}`);

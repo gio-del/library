@@ -32,6 +32,19 @@ export function genreCounts(books: Book[], f: ReadFilter, selected: string): [st
 
 export const seriesOf = (b: Book) => (typeof b.series === 'string' ? b.series.trim() : '');
 
+/** Chiave di confronto della collana: senza maiuscole né spazi in eccesso. */
+export const seriesKey = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** Quanti libri ha la collana del libro (lui compreso) e quanti letti; null se non ne esistono altri. */
+export function seriesSummary(books: Book[], book: Book): { name: string; total: number; read: number } | null {
+  const name = seriesOf(book);
+  if (!name) return null;
+  const key = seriesKey(name);
+  const same = books.filter((b) => b.isbn === book.isbn || seriesKey(seriesOf(b)) === key);
+  if (!same.some((b) => b.isbn !== book.isbn)) return null;
+  return { name, total: same.length, read: same.filter((b) => b.read).length };
+}
+
 export function seriesCounts(books: Book[], f: ReadFilter, selected: string): [string, number][] {
   const counts = new Map<string, number>();
   for (const b of books.filter((x) => matchRead(x, f))) {
