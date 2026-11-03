@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { libraryStats } from '../lib/books';
+import { useNavigate } from 'react-router-dom';
+import { libraryStats, topAuthors } from '../lib/books';
 import { useBooks } from '../state/books';
 import { Msg } from '../components/ui';
 import { YearGoal, readInYear } from '../components/YearGoal';
@@ -19,10 +20,12 @@ function Bar({ label, count, max, total }: { label: string; count: number; max: 
 }
 
 export function Stats() {
+  const nav = useNavigate();
   const { books, loaded, load } = useBooks();
   useEffect(() => { if (!loaded) void load().catch(() => {}); }, [loaded, load]);
   const now = new Date();
   const s = libraryStats(books, now);
+  const authors = topAuthors(books);
   const pct = s.total ? Math.round((s.read / s.total) * 100) : 0;
   const h = 'mb-2 text-sm font-semibold uppercase tracking-wide text-muted';
   return (
@@ -43,6 +46,21 @@ export function Stats() {
             <h2 id="st-gen" className={h}>Generi più frequenti</h2>
             <ul className="space-y-2">{s.genres.map(([g, n]) => <Bar key={g} label={g} count={n} max={s.genres[0][1]} total={s.total} />)}</ul>
           </section>
+          {authors.length > 0 && (
+            <section aria-labelledby="st-aut">
+              <h2 id="st-aut" className={h}>Autori</h2>
+              <ul className="space-y-2">
+                {authors.map((a) => (
+                  <li key={a.name}>
+                    <button type="button" onClick={() => nav('/libreria', { state: { author: a.name } })} aria-label={`Mostra i libri di ${a.name}`} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl bg-lilac-soft px-4 py-2 text-left text-plum">
+                      <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{a.name}</span>
+                      <span className="shrink-0 text-sm">{a.books} libri · {a.read} letti</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section aria-labelledby="st-voto">
             <h2 id="st-voto" className={h}>Voti</h2>
             {s.avgRating === null ? <p className="text-sm text-muted">Nessun voto ancora.</p> : (

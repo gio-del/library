@@ -58,6 +58,26 @@ export function authorCounts(books: Book[], f: ReadFilter, selected: string): [s
   return [...counts.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
 }
 
+export interface AuthorTop { name: string; books: number; read: number }
+
+/** I primi `limit` autori con almeno 2 libri: per libri decrescenti, poi per cognome. */
+export function topAuthors(books: Book[], limit = 5): AuthorTop[] {
+  const m = new Map<string, AuthorTop>();
+  for (const b of books) {
+    const names = authorsOf(b);
+    for (const k of new Set(names.map(norm))) {
+      const e = m.get(k) || { name: names.find((a) => norm(a) === k)!, books: 0, read: 0 };
+      e.books++;
+      if (b.read) e.read++;
+      m.set(k, e);
+    }
+  }
+  return [...m.values()]
+    .filter((e) => e.books >= 2)
+    .sort((a, b) => b.books - a.books || authorSortKey(a.name).localeCompare(authorSortKey(b.name), 'it'))
+    .slice(0, limit);
+}
+
 export function filterBooks(books: Book[], f: ReadFilter, genre: string): Book[] {
   return books.filter((b) => matchRead(b, f) && (!genre || bookGenres(b).includes(genre)));
 }
