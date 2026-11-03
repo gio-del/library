@@ -1,4 +1,4 @@
-import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, sortBooks } from '../lib/books';
+import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -152,5 +152,15 @@ describe('sameWork / findOtherEdition', () => {
     const t = b({ isbn: '2', title: 'il nome della rosa', authors: ['Umberto Eco'] });
     expect(findOtherEdition([a], t)?.isbn).toBe('1');
     expect(findOtherEdition([a], { ...t, isbn: '1' })).toBeUndefined();
+  });
+
+  it('authorCounts raggruppa gli autori ignorando maiuscole e accenti e conta una volta per libro', () => {
+    const list = [
+      { isbn: '1', title: 'A', authors: ['Jane Austen', 'jane austen'] },
+      { isbn: '2', title: 'B', authors: ['JANE AUSTEN', 'Élodie Rossi'], read: true },
+      { isbn: '3', title: 'C' },
+    ] as Book[];
+    expect(authorCounts(list, 'all', '')).toEqual([['Jane Austen', 2], ['Élodie Rossi', 1]]);
+    expect(authorCounts(list, 'read', 'Zed')).toEqual([['Élodie Rossi', 1], ['JANE AUSTEN', 1], ['Zed', 0]]);
   });
 });

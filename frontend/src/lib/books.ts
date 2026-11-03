@@ -42,6 +42,22 @@ export function seriesCounts(books: Book[], f: ReadFilter, selected: string): [s
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
 }
 
+export const authorsOf = (b: Book): string[] => (Array.isArray(b.authors) ? b.authors : []).filter((a): a is string => typeof a === 'string' && !!a.trim()).map((a) => a.trim());
+export const hasAuthor = (b: Book, author: string) => authorsOf(b).some((a) => norm(a) === norm(author));
+
+export function authorCounts(books: Book[], f: ReadFilter, selected: string): [string, number][] {
+  const counts = new Map<string, [string, number]>();
+  for (const b of books.filter((x) => matchRead(x, f))) {
+    for (const k of new Set(authorsOf(b).map(norm))) {
+      const e = counts.get(k) || [authorsOf(b).find((a) => norm(a) === k)!, 0];
+      e[1]++;
+      counts.set(k, e);
+    }
+  }
+  if (selected && !counts.has(norm(selected))) counts.set(norm(selected), [selected, 0]);
+  return [...counts.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
+}
+
 export function filterBooks(books: Book[], f: ReadFilter, genre: string): Book[] {
   return books.filter((b) => matchRead(b, f) && (!genre || bookGenres(b).includes(genre)));
 }

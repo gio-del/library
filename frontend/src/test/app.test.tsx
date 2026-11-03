@@ -818,4 +818,47 @@ describe('scorrimento a lettere', () => {
     await sortBy('Voto');
     expect(screen.queryByTestId('letter-rail')).not.toBeInTheDocument();
   });
+
+  it('il foglio Filtri filtra per autore, si combina con lo stato e il chip lo toglie', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg' },
+      { isbn: '9780306406164', title: 'Emma', authors: ['Jane Austen'], cover: 'b.jpg', read: true },
+      { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], cover: 'c.jpg' },
+    ] });
+    const { container } = open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const group = within(await screen.findByRole('group', { name: 'Autore' }));
+    expect(group.getByRole('button', { name: /^Jane Austen/ })).toHaveTextContent('2');
+    await userEvent.click(group.getByRole('button', { name: /^Jane Austen/ }));
+    expect(screen.queryByText('Dune')).not.toBeInTheDocument();
+    expect(screen.getByText('Emma')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-dot')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    expect(screen.getByText('Emma')).toBeInTheDocument();
+    expect([...container.querySelectorAll('*')].filter((el) => /overflow-x-(auto|scroll)/.test(el.getAttribute('class') || ''))).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Autore Jane Austen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Tutti/ }));
+    expect(screen.getByText('Dune')).toBeInTheDocument();
+    expect(screen.queryByTestId('filter-dot')).not.toBeInTheDocument();
+  });
+
+  it('dalla scheda del libro un tocco sull’autore apre la Libreria filtrata', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg' },
+      { isbn: '9780306406164', title: 'Emma', authors: ['Jane Austen'], cover: 'b.jpg' },
+      { isbn: '9780306406171', title: 'Dune', authors: ['Herbert'], cover: 'c.jpg' },
+    ] });
+    open('/libro/9780306406157');
+    await userEvent.click(await screen.findByRole('button', { name: 'Mostra i libri di Jane Austen' }));
+    expect(await screen.findByText('Emma')).toBeInTheDocument();
+    expect(screen.queryByText('Dune')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Togli il filtro Autore Jane Austen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
+    expect(await screen.findByText('Dune')).toBeInTheDocument();
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
 });

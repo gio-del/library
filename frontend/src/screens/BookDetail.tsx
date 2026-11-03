@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
-import { GENRES, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry, ratingOf, todayIso } from '../lib/books';
+import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry, ratingOf, todayIso } from '../lib/books';
 import { isbn10Of } from '../lib/isbn';
 import type { Book, Candidate } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -223,7 +223,16 @@ export function BookDetail() {
           <button type="button" className={`${tool} !bg-ko/10 text-ko`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>
         </div>
         <dl className="m-0 rounded-xl bg-paper p-4 shadow-sm">
-          {rows(book).map(([k, v]) => <div key={k} className="py-1.5"><dt className="text-sm text-muted">{k}</dt><dd className="m-0 [overflow-wrap:anywhere]">{v}</dd></div>)}
+          {rows(book).map(([k, v]) => (
+            <div key={k} className="py-1.5">
+              <dt className="text-sm text-muted">{k}</dt>
+              {k === 'Autori' ? (
+                <dd className="m-0 flex flex-wrap gap-2 pt-1">
+                  {authorsOf(book).map((a) => <button key={a} type="button" onClick={() => nav('/libreria', { state: { author: a } })} aria-label={`Mostra i libri di ${a}`} className="min-h-11 max-w-full rounded-full bg-lilac-soft px-4 text-left font-medium text-plum [overflow-wrap:anywhere]">{a}</button>)}
+                </dd>
+              ) : <dd className="m-0 [overflow-wrap:anywhere]">{v}</dd>}
+            </div>
+          ))}
         </dl>
       </div>
       <Confirm open={askDelete} onOpenChange={setAskDelete} title="Eliminare il libro?" action="Elimina" danger onConfirm={() => void del()}>«{bookTitle(book)}» sparirà dalla libreria.</Confirm>
