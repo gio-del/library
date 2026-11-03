@@ -905,7 +905,7 @@ describe('completa i dati mancanti', () => {
     expect(screen.getByText('Completati: 1')).toBeInTheDocument();
     expect(screen.getByText('Ancora incompleti: 2')).toBeInTheDocument();
     expect(screen.getByText('Fonte non raggiunta: 2')).toBeInTheDocument();
-    expect(calls.filter((c) => c.startsWith('POST')).map((c) => c.slice(-23).replace(/^\//, ''))).toEqual(list.map((b) => `${b.isbn}/lookup`));
+    expect(calls.filter((c) => c.startsWith('POST')).map((c) => /\d{13}\/lookup/.exec(c)?.[0])).toEqual(list.map((b) => `${b.isbn}/lookup`));
   });
 
   it('Ferma interrompe subito e non cerca gli altri libri', async () => {
