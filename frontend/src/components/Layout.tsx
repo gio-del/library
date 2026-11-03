@@ -4,11 +4,12 @@ import { useRef, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { api } from '../lib/api';
 import { cn } from '../lib/cn';
-import { needsRetry } from '../lib/books';
 import type { Book } from '../lib/types';
 import { useAuth } from '../state/auth';
 import { useBooks } from '../state/books';
 import { useLock } from '../hooks/useLock';
+import { useCompleteMissing } from '../hooks/useCompleteMissing';
+import { CompleteSheet } from './CompleteSheet';
 import { Ornament } from './Ornament';
 import { Confirm } from './Confirm';
 import { useToast } from './Toast';
@@ -37,15 +38,16 @@ export function BottomNav() {
   );
 }
 
-type Manage = 'classify' | 'retry';
 
 export function TopBar() {
   const { logout } = useAuth();
-  const { books, load, setAll } = useBooks();
+  const { load, setAll } = useBooks();
   const { toast } = useToast();
   const lock = useLock();
-  const [ask, setAsk] = useState<Manage | null>(null);
-  const missing = books.filter(needsRetry).length;
+  const [ask, setAsk] = useState<'classify' | null>(null);
+  const complete = useCompleteMissing();
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const missing = complete.pending;
   const fileInput = useRef<HTMLInputElement>(null);
 
   async function importFile(file: File | undefined) {
@@ -62,19 +64,13 @@ export function TopBar() {
     });
   }
 
-  async function run(what: Manage) {
+  async function run() {
     await lock('manage', async () => {
-      toast(what === 'classify' ? 'Rileggo i generi…' : 'Cerco i libri incompleti…');
+      toast('Rileggo i generi…');
       try {
-        if (what === 'classify') {
-          const r = await api<{ books: Book[]; changed: number }>('POST', '/api/books/classify');
-          setAll(r.books);
-          toast(`Generi aggiornati su ${r.changed} libri`);
-        } else {
-          const r = await api<{ found: number; retried: number }>('POST', '/api/books/lookup-failed');
-          await load();
-          toast(`Aggiornati ${r.found} libri su ${r.retried}`);
-        }
+        const r = await api<{ books: Book[]; changed: number }>('POST', '/api/books/classify');
+        setAll(r.books);
+        toast(`Generi aggiornati su ${r.changed} libri`);
       } catch (e) { toast((e as Error).message, true); }
     });
   }
@@ -106,7 +102,7 @@ export function TopBar() {
             <DropdownMenu.Item className={item} asChild><Link to="/statistiche"><ChartNoAxesColumn aria-hidden className="size-5 text-plum" />Statistiche</Link></DropdownMenu.Item>
             <DropdownMenu.Item className={item} asChild><Link to="/desideri"><Heart aria-hidden className="size-5 text-plum" />Desideri</Link></DropdownMenu.Item>
             <DropdownMenu.Item className={item} onSelect={() => setAsk('classify')}><Tags aria-hidden className="size-5 text-plum" />Rileggi i generi</DropdownMenu.Item>
-            <DropdownMenu.Item className={item} onSelect={() => setAsk('retry')}><RefreshCw aria-hidden className="size-5 text-plum" />Cerca di nuovo i dati{missing > 0 && <span className="ml-auto rounded-full bg-gold px-2 text-xs font-semibold text-plum">{missing}</span>}</DropdownMenu.Item>
+            <DropdownMenu.Item className={item} disabled={missing === 0} onSelect={() => setCompleteOpen(true)}><RefreshCw aria-hidden className="size-5 text-plum" />Completa i dati mancanti<span className={missing > 0 ? 'ml-auto rounded-full bg-gold px-2 text-xs font-semibold text-plum' : 'ml-auto text-xs text-muted'}>{missing > 0 ? missing : 'nessun libro incompleto'}</span></DropdownMenu.Item>
             <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=json" download><Download aria-hidden className="size-5 text-plum" />Esporta (JSON)</a></DropdownMenu.Item>
             <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=csv" download><Download aria-hidden className="size-5 text-plum" />Esporta (CSV)</a></DropdownMenu.Item>
             <DropdownMenu.Item className={item} onSelect={() => fileInput.current?.click()}><Upload aria-hidden className="size-5 text-plum" />Importa</DropdownMenu.Item>
@@ -116,12 +112,10 @@ export function TopBar() {
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <input ref={fileInput} type="file" accept="application/json,.json" aria-label="File da importare" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void importFile(f); }} />
-      <Confirm open={ask === 'classify'} onOpenChange={(o) => !o && setAsk(null)} title="Rileggere i generi?" action="Rileggi i generi" onConfirm={() => void run('classify')}>
+      <Confirm open={ask === 'classify'} onOpenChange={(o) => !o && setAsk(null)} title="Rileggere i generi?" action="Rileggi i generi" onConfirm={() => void run()}>
         Cerco di nuovo il genere di ogni libro. Quelli che hai corretto a mano non vengono toccati.
       </Confirm>
-      <Confirm open={ask === 'retry'} onOpenChange={(o) => !o && setAsk(null)} title="Cercare di nuovo i dati?" action="Cerca di nuovo" onConfirm={() => void run('retry')}>
-        {missing > 0 ? `Riprovo la ricerca per ${missing} libri senza dati o senza copertina.` : 'Nessun libro ha dati o copertina mancanti.'}
-      </Confirm>
+      <CompleteSheet open={completeOpen} onOpenChange={setCompleteOpen} c={complete} />
     </header>
   );
 }

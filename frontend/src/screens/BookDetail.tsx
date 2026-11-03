@@ -16,6 +16,7 @@ import { CoverViewer } from '../components/CoverViewer';
 import { Confirm } from '../components/Confirm';
 import { SubPage } from '../components/SubPage';
 import { useToast } from '../components/Toast';
+import { retryLookup } from '../hooks/useCompleteMissing';
 import { OnlineSearch, fillEmpty } from '../components/OnlineSearch';
 import { Badge, Button, Field, Input, Msg, Textarea } from '../components/ui';
 
@@ -136,7 +137,7 @@ export function BookDetail() {
       setSearching(true);
       setLookupMsg(null);
       try {
-        const r = await api<{ book: Book; sources?: Record<string, string> }>('POST', `/api/books/${isbn}/lookup`);
+        const r = await retryLookup(isbn);
         upsert(r.book);
         // l'esito resta sulla scheda finché non si cerca di nuovo: il toast da solo spariva troppo presto
         setLookupMsg(r.book.lookup === 'failed'
