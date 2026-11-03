@@ -596,3 +596,28 @@ test('desideri: sessione, doppioni, 409 se in libreria, rimozione e acquisto', a
   assert.strictEqual((await call('DELETE', '/api/wishlist/9780804429573', undefined, c)).status, 200);
   assert.strictEqual((await call('DELETE', '/api/wishlist/9780804429573', undefined, c)).status, 404);
 });
+
+test('«Cerca di nuovo» su un libro senza dati non sovrascrive i campi compilati e riporta le fonti non raggiunte', async (t) => {
+  let up = false;
+  const f = (url) => {
+    const u = String(url);
+    if (!up && u.includes('9780306406157')) return Promise.reject(new DOMException('timeout', 'TimeoutError'));
+    return fakeFetch(u);
+  };
+  const { call, login } = await start(t, f);
+  const sid = await login();
+  const isbn = '9780306406157';
+  await call('POST', '/api/books', { isbn }, sid);
+  await call('PATCH', `/api/books/${isbn}`, { title: 'Il mio titolo' }, sid);
+  const down = await (await call('POST', `/api/books/${isbn}/lookup`, undefined, sid)).json();
+  assert.strictEqual(down.book.lookup, 'failed');
+  assert.ok(Object.values(down.sources).includes('error'));
+  assert.strictEqual(down.book.title, 'Il mio titolo');
+  up = true;
+  const r = await (await call('POST', `/api/books/${isbn}/lookup`, undefined, sid)).json();
+  assert.strictEqual(r.book.title, 'Il mio titolo');
+  assert.deepStrictEqual(r.book.authors, ['Ada Rossi']);
+  assert.strictEqual(r.book.publisher, 'Ed');
+  assert.strictEqual(r.book.lookup, undefined);
+  assert.strictEqual(r.book.cover, `${isbn}.jpg`);
+});

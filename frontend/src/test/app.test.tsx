@@ -5,6 +5,7 @@ import { App } from '../App';
 import { AuthProvider } from '../state/auth';
 import type { Book } from '../lib/types';
 import { todayIso } from '../lib/books';
+import { pacing } from '../hooks/useCompleteMissing';
 
 const BOOKS: Book[] = [
   { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], genres: ['Narrativa'], cover: 'a.jpg' },
@@ -860,5 +861,73 @@ describe('scorrimento a lettere', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
     expect(await screen.findByText('Dune')).toBeInTheDocument();
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+});
+
+describe('completa i dati mancanti', () => {
+  const inc = (n: number): Book => ({ isbn: `97803064${String(n).padStart(5, '0')}`, title: '', authors: [], genres: [], cover: null, lookup: 'failed' });
+  const menu = async () => {
+    await userEvent.click(await screen.findByRole('button', { name: 'Altro' }));
+    return screen.findByRole('menuitem', { name: /Completa i dati mancanti/ });
+  };
+  beforeEach(() => { pacing.ms = 30; window.innerWidth = 360; });
+  afterEach(() => { pacing.ms = 1500; });
+
+  it('con zero libri incompleti la voce è disattivata e lo dice', async () => {
+    server();
+    open('/libreria');
+    const item = await menu();
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(item.textContent).toMatch(/nessun libro incompleto/);
+    expect(item.className).toContain('min-h-11');
+  });
+
+  it('elabora un libro alla volta con avanzamento e riepilogo, un errore non ferma gli altri', async () => {
+    const list = [inc(1), inc(2), inc(3)];
+    const calls = server({ 'GET /api/books': list });
+    const base = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      if (i?.method !== 'POST') return base(u, i);
+      calls.push(`POST ${u}`);
+      if (u.includes(list[0].isbn)) return new Response(JSON.stringify({ book: { ...list[0], title: 'Uno', cover: 'x.jpg', lookup: undefined } }), { status: 200 });
+      if (u.includes(list[1].isbn)) return new Response(JSON.stringify({ error: 'boom' }), { status: 500 });
+      return new Response(JSON.stringify({ book: list[2], sources: { openlibrary: 'error', sbn: 'notfound' } }), { status: 200 });
+    }));
+    open('/libreria');
+    const item = await menu();
+    expect(item.textContent).toContain('3');
+    await userEvent.click(item);
+    expect(await screen.findByText(/3 libri hanno dati o copertina mancanti/)).toBeInTheDocument();
+    const start = screen.getByRole('button', { name: 'Avvia' });
+    expect(start.className).toContain('min-h-11');
+    await userEvent.click(start);
+    await screen.findByText('Finito: 3 libri elaborati');
+    expect(screen.getByText('Completati: 1')).toBeInTheDocument();
+    expect(screen.getByText('Ancora incompleti: 2')).toBeInTheDocument();
+    expect(screen.getByText('Fonte non raggiunta: 2')).toBeInTheDocument();
+    expect(calls.filter((c) => c.startsWith('POST')).map((c) => c.slice(-20))).toEqual(list.map((b) => `/${b.isbn}/lookup`));
+  });
+
+  it('Ferma interrompe subito e non cerca gli altri libri', async () => {
+    pacing.ms = 200;
+    const list = [inc(1), inc(2), inc(3)];
+    const calls = server({ 'GET /api/books': list });
+    const base = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      if (i?.method !== 'POST') return base(u, i);
+      calls.push(`POST ${u}`);
+      return new Response(JSON.stringify({ book: list[0], sources: { openlibrary: 'notfound' } }), { status: 200 });
+    }));
+    open('/libreria');
+    await userEvent.click(await menu());
+    await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
+    const stop = await screen.findByRole('button', { name: 'Ferma' });
+    expect(stop.className).toContain('min-h-11');
+    await userEvent.click(stop);
+    await screen.findByText('Fermato dopo 1 di 3');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.filter((c) => c.startsWith('POST'))).toHaveLength(1);
+    expect(screen.getByText('Ancora incompleti: 1')).toBeInTheDocument();
+    expect(screen.getByText('Fonte non raggiunta: 0')).toBeInTheDocument();
   });
 });

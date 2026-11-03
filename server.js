@@ -112,7 +112,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     } catch { /* senza copertina */ }
   }
 
-  async function fillBook(book, outcomes = {}) {
+  async function fillBook(book, outcomes = {}, { cover = true } = {}) {
     delete book.lookup;
     let found = null;
     try { found = await lookup(book.isbn, fetchFn, { outcomes }); } catch { /* trattato come non trovato */ }
@@ -121,7 +121,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     book.subjects = found.subjects || [];
     book.dewey = found.dewey || '';
     if (!book.genresManual) book.genres = classify(book.subjects, { dewey: book.dewey, title: book.title, description: book.description });
-    if (found.cover) await saveCover(book, found.cover);
+    if (cover && found.cover) await saveCover(book, found.cover);
   }
 
   async function addBook(isbn) {
@@ -155,7 +155,16 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       // dati già presenti: si cerca solo la copertina
       const cover = await fetchCover(old.isbn, fetchFn);
       if (cover) await saveCover(book, cover);
-    } else await fillBook(book, sources);
+    } else {
+      // libro senza dati: si riempiono solo i campi ancora vuoti, mai quelli compilati a mano
+      const found = { ...old };
+      await fillBook(found, sources, { cover: !old.cover });
+      const empty = (v) => (Array.isArray(v) ? !v.length : !v);
+      for (const [k, v] of Object.entries(found)) if (!(k in old) || empty(old[k]) || ['lookup', 'subjects', 'dewey', 'source', 'genres'].includes(k)) book[k] = v;
+      if (old.genresManual) book.genres = old.genres;
+      if (found.lookup === undefined) delete book.lookup;
+      if (!empty(old.cover)) book.cover = old.cover;
+    }
     const saved = await store.replace(book);
     return saved ? { book: saved, sources } : null;
   }
