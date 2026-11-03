@@ -1,4 +1,4 @@
-import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors } from '../lib/books';
+import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -173,5 +173,16 @@ describe('topAuthors', () => {
     expect(topAuthors([b(['A']), b(['B'])])).toEqual([]);
     const many = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((n) => [b([n]), b([n])]);
     expect(topAuthors(many)).toHaveLength(5);
+  });
+
+  it('seriesSummary conta i libri della collana senza badare a maiuscole e spazi, null se il libro è solo', () => {
+    const a = { isbn: '1', title: 'A', series: 'Narnia', read: true } as Book;
+    const b = { isbn: '2', title: 'B', series: '  narnia ' } as Book;
+    const c = { isbn: '3', title: 'C', series: 'Altra', read: true } as Book;
+    const d = { isbn: '4', title: 'D' } as Book;
+    expect(seriesSummary([a, b, c, d], a)).toEqual({ name: 'Narnia', total: 2, read: 1 });
+    expect(seriesSummary([a, b, c, d], b)).toEqual({ name: 'narnia', total: 2, read: 1 });
+    expect(seriesSummary([a, b, c, d], c)).toBeNull();
+    expect(seriesSummary([a, b, c, d], d)).toBeNull();
   });
 });

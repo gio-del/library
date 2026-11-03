@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
-import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry, ratingOf, todayIso } from '../lib/books';
+import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry, ratingOf, seriesSummary, todayIso } from '../lib/books';
 import { isbn10Of } from '../lib/isbn';
 import type { Book, Candidate } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -57,6 +57,7 @@ export function BookDetail() {
   const { toast } = useToast();
   const { books, loaded, load, upsert, remove } = useBooks();
   const book = books.find((b) => b.isbn === isbn);
+  const serie = book ? seriesSummary(books, book) : null;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [picked, setPicked] = useState<string[]>([]);
@@ -223,6 +224,12 @@ export function BookDetail() {
           <button type="button" className={tool} onClick={startEdit}><Pencil aria-hidden className="size-5" />Modifica</button>
           <button type="button" className={`${tool} !bg-ko/10 text-ko`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>
         </div>
+        {serie && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-paper p-4 shadow-sm">
+            <p className="m-0 [overflow-wrap:anywhere]">Collana: {serie.total} libri, {serie.read} letti</p>
+            <button type="button" onClick={() => nav('/libreria', { state: { series: serie.name } })} className="min-h-11 rounded-full bg-lilac-soft px-4 font-medium text-plum">Vedi la collana</button>
+          </div>
+        )}
         <dl className="m-0 rounded-xl bg-paper p-4 shadow-sm">
           {rows(book).map(([k, v]) => (
             <div key={k} className="py-1.5">
