@@ -11,6 +11,16 @@ import { LetterRail, type RailGroup } from '../components/LetterRail';
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
 const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
 const DEFAULT_ORDER: SortOrder = 'author';
+const ORDER_KEY = 'library.order';
+
+// L'ordine scelto resta sul telefono: dopo il ricarico si riparte da quello, non dal predefinito.
+function savedOrder(): SortOrder {
+  try {
+    const v = localStorage.getItem(ORDER_KEY);
+    return ORDERS.some(([o]) => o === v) ? (v as SortOrder) : DEFAULT_ORDER;
+  } catch { return DEFAULT_ORDER; }
+}
+function saveOrder(o: SortOrder) { try { localStorage.setItem(ORDER_KEY, o); } catch { /* spazio non disponibile: resta per questa sessione */ } }
 
 const MIN_RAIL = 12;
 
@@ -21,7 +31,7 @@ export function Library() {
   const [series, setSeries] = useState('');
   const [author, setAuthor] = useState('');
   const [minRating, setMinRating] = useState(0);
-  const [order, setOrder] = useState<SortOrder>(DEFAULT_ORDER);
+  const [order, setOrder] = useState<SortOrder>(savedOrder);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
@@ -29,7 +39,7 @@ export function Library() {
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
   // Dalla scheda del libro si arriva con l'autore scelto nello stato di navigazione.
-  useEffect(() => { setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setMinRating(0); setQuery(''); setOrder(savedOrder()); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
@@ -106,7 +116,7 @@ export function Library() {
         <p className="mb-2 text-sm font-medium text-muted">Ordina per</p>
         <div role="group" aria-label="Ordina per" className="mb-4 flex flex-col gap-2">
           {ORDERS.map(([o, label]) => (
-            <button key={o} type="button" aria-pressed={order === o} onClick={() => setOrder(o)} className={cn('flex min-h-12 items-center rounded-xl px-4 text-left font-medium', order === o ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{label}</button>
+            <button key={o} type="button" aria-pressed={order === o} onClick={() => { setOrder(o); saveOrder(o); }} className={cn('flex min-h-12 items-center rounded-xl px-4 text-left font-medium', order === o ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{label}</button>
           ))}
         </div>
         <p className="mb-2 text-sm font-medium text-muted">Voto minimo</p>
@@ -138,7 +148,7 @@ export function Library() {
             </div>
           </>
         )}
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setAuthor(''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setAuthor(''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); saveOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );
