@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { authorCounts, bookGenres, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks } from '../state/books';
-import { useLibraryView } from '../state/libraryView';
+import { useLibraryView, type LibraryView } from '../state/libraryView';
 import { Badge, Cover, Input, Msg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { LetterRail, type RailGroup } from '../components/LetterRail';
