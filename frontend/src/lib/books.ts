@@ -116,7 +116,16 @@ export function sameWork(a: Partial<Book>, b: Partial<Book>): boolean {
 export const findOtherEdition = (books: Book[], candidate: Partial<Book>): Book | undefined =>
   books.find((b) => b.isbn !== candidate.isbn && sameWork(b, candidate));
 
-export type SortOrder = 'recent' | 'title' | 'author' | 'rating';
+export type SortOrder = 'recent' | 'read' | 'year' | 'title' | 'author' | 'rating';
+
+/** Anno di pubblicazione numerico (intero a 1-4 cifre, anche come testo), altrimenti null. */
+export function yearOf(b: Book): number | null {
+  const y: unknown = b.year;
+  if (typeof y === 'number') return Number.isInteger(y) && y > 0 && y < 10000 ? y : null;
+  return typeof y === 'string' && /^\d{1,4}$/.test(y.trim()) && Number(y) > 0 ? Number(y.trim()) : null;
+}
+/** Data di lettura `AAAA-MM-GG`, altrimenti null. */
+export const readAtOf = (b: Book): string | null => (typeof b.readAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.readAt) ? b.readAt : null);
 export const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // Chiave d'ordine dell'autore: «cognome nome». Cognome = ultima parola con le particelle che la precedono («de», «van», «Le»…);
@@ -143,6 +152,15 @@ export function sortBooks(books: Book[], order: SortOrder): Book[] {
   return [...books].sort((a, b) => {
     if (order === 'rating') {
       const x = ratingOf(a), y = ratingOf(b);
+      return x && y ? y - x : x ? -1 : y ? 1 : 0;
+    }
+    if (order === 'read') {
+      const x = readAtOf(a), y = readAtOf(b);
+      if (!x || !y) return x ? -1 : y ? 1 : 0;
+      return x < y ? 1 : x > y ? -1 : 0;
+    }
+    if (order === 'year') {
+      const x = yearOf(a), y = yearOf(b);
       return x && y ? y - x : x ? -1 : y ? 1 : 0;
     }
     if (order === 'recent') {
@@ -224,6 +242,11 @@ export function libraryStats(books: Book[], now: Date): LibraryStats {
 /** Etichetta del gruppo per lo scorrimento a lettere: iniziale della chiave d'ordine, mese per «recenti», `#` per il resto; `null` = niente scorrimento (voto). */
 export function groupLabel(b: Book, order: SortOrder): string | null {
   if (order === 'rating') return null;
+  if (order === 'year') return String(yearOf(b) ?? '#');
+  if (order === 'read') {
+    const r = readAtOf(b);
+    return r ? new Date(Number(r.slice(0, 4)), Number(r.slice(5, 7)) - 1, 1).toLocaleDateString('it', { month: 'short', year: 'numeric' }) : '#';
+  }
   if (order === 'recent') {
     const d = b.added ? new Date(b.added) : null;
     return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('it', { month: 'short', year: 'numeric' }) : '#';

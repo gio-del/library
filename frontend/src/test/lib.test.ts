@@ -1,4 +1,4 @@
-import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
+import { groupLabel, amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -152,6 +152,25 @@ describe('groupStarts', () => {
   it('per recenti raggruppa per mese', () => {
     const list = sortBooks([b('1', 'A', ['X'], '2026-03-05'), b('2', 'B', ['X'], '2026-03-01'), b('3', 'C', ['X'], '2026-01-09')], 'recent');
     expect(groupStarts(list, 'recent').map((g) => g.isbn)).toEqual(['1', '3']);
+  });
+});
+
+describe('ordini per lettura e anno', () => {
+  const mk = (isbn: string, o: Partial<Book>): Book => ({ isbn, title: isbn, authors: [], ...o });
+  const l = [mk('n', {}), mk('a', { readAt: '2026-01-10', year: 1999 }), mk('c', { readAt: '2026-05-02', year: '2020' }), mk('x', { readAt: 'ieri', year: 'boh' })];
+  it('read: data decrescente, senza data in fondo', () => {
+    expect(sortBooks(l, 'read').map((x) => x.isbn)).toEqual(['c', 'a', 'n', 'x']);
+  });
+  it('year: più recente prima, non numerico o mancante in fondo', () => {
+    expect(sortBooks(l, 'year').map((x) => x.isbn)).toEqual(['c', 'a', 'n', 'x']);
+  });
+  it('etichette del rail', () => {
+    expect(groupLabel(l[1], 'year')).toBe('1999');
+    expect(groupLabel(l[0], 'year')).toBe('#');
+    expect(groupLabel(l[3], 'year')).toBe('#');
+    expect(groupLabel(l[1], 'read')).toBe(new Date(2026, 0, 1).toLocaleDateString('it', { month: 'short', year: 'numeric' }));
+    expect(groupLabel(l[0], 'read')).toBe('#');
+    expect(groupLabel(l[3], 'read')).toBe('#');
   });
 });
 
