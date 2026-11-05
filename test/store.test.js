@@ -137,3 +137,17 @@ test('copia giornaliera: se la cartella non è scrivibile il salvataggio riesce'
   } finally { console.warn = warn; }
   assert.ok(logs.some((m) => /copia giornaliera/.test(m)));
 });
+
+test('bulk: una sola scrittura, eliminazione, ripristino se il salvataggio fallisce', async () => {
+  const dir = tmp();
+  const s = createStore(dir);
+  for (const i of ['1', '2', '3']) await s.add({ isbn: i, n: 0 });
+  const r = await s.bulk(['1', '2', '9', '1'], (b) => (b.isbn === '1' ? { ...b, n: 1 } : null));
+  assert.deepStrictEqual([r.updated.length, r.removed.length, r.missing], [1, 1, ['9']]);
+  assert.deepStrictEqual(await createStore(dir).list(), [{ isbn: '1', n: 1 }, { isbn: '3', n: 0 }]);
+  fs.rmSync(path.join(dir, 'books.json.bak'));
+  fs.mkdirSync(path.join(dir, 'books.json.bak'));
+  fs.writeFileSync(path.join(dir, 'x'), '');
+  await assert.rejects(s.bulk(['3'], () => null));
+  assert.strictEqual((await s.list()).length, 2);
+});
