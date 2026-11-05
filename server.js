@@ -18,6 +18,7 @@ const { cleanFields, cleanReading, toCsv, parseImport } = require('./lib/exporte
 
 const MAX_BODY = 4096;
 const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
+const MAX_BULK_BODY = 64 * 1024;
 const MAX_IMPORT = 5 * 1024 * 1024;
 // chiave di un libro: ISBN-13, oppure «m» + 12 esadecimali per i libri aggiunti a mano senza ISBN
 const KEY = '(?:\\d{13}|m[0-9a-f]{12})';
@@ -311,6 +312,30 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     if (req.method === 'POST' && p === '/api/books/classify') {
       const changed = await classifyAll();
       return send(res, 200, { changed, books: await store.list() });
+    }
+    if (req.method === 'POST' && p === '/api/books/bulk') {
+      const b = await readJson(req, MAX_BULK_BODY);
+      if (!Array.isArray(b.isbns) || !b.isbns.length || b.isbns.length > 1000 || b.isbns.some((k) => typeof k !== 'string' || !keyRe('').test(k))) return send(res, 400, { error: 'Libri non validi' });
+      if (!['read', 'unread', 'addGenre', 'delete'].includes(b.action)) return send(res, 400, { error: 'Azione non valida' });
+      let genre = '';
+      if (b.action === 'addGenre') {
+        genre = typeof b.value === 'string' ? b.value.trim().slice(0, 40) : '';
+        if (!genre || genre === 'Altro' || genre === 'Senza genere') return send(res, 400, { error: 'Genere non valido' });
+      }
+      const today = new Date(now()).toISOString().slice(0, 10);
+      const change = {
+        read: (x) => (x.read ? undefined : { ...x, read: true, ...(x.readAt ? {} : { readAt: today }) }),
+        unread: (x) => (x.read ? { ...x, read: false } : undefined),
+        addGenre: (x) => {
+          const g = Array.isArray(x.genres) ? x.genres : [];
+          return g.includes(genre) || g.length >= MAX_GENRES ? undefined : { ...x, genres: [...g, genre], genresManual: true };
+        },
+        delete: () => null,
+      }[b.action];
+      const r = await store.bulk(b.isbns, change);
+      for (const gone of r.removed) if (gone.cover) await fsp.rm(path.join(coversDir, gone.cover), { force: true });
+      const done = r.updated.length + r.removed.length;
+      return send(res, 200, { updated: r.updated.map((x) => x.isbn), removed: r.removed.map((x) => x.isbn), books: r.updated, done, failed: r.missing.length, unchanged: r.skipped.length });
     }
     const lk = /^\/api\/books\/(\d{13})\/lookup$/.exec(p); // solo con ISBN
     if (req.method === 'POST' && lk) {
