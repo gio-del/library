@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
 import { useAuth } from './state/auth';
 import { BooksProvider } from './state/books';
+import { LibraryViewProvider } from './state/libraryView';
 import { Layout } from './components/Layout';
 import { Login } from './screens/Login';
 import { Library } from './screens/Library';
@@ -18,6 +19,7 @@ export function App() {
   if (status === 'out') return <Login />;
   return (
     <BooksProvider>
+      <LibraryViewProvider>
       <ToastProvider>
         <Routes>
           <Route element={<Layout />}>
@@ -32,6 +34,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/libreria" replace />} />
         </Routes>
       </ToastProvider>
+    </LibraryViewProvider>
     </BooksProvider>
   );
 }
