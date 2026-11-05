@@ -61,7 +61,7 @@ export function YearGoal({ year, done }: { year: number; done: number }) {
         <Button variant="soft" onClick={edit}>Imposta un obiettivo</Button>
       ) : (
         <>
-          <p className="text-lg"><strong className="text-plum">{done} di {goal}</strong> {goal === 1 ? 'libro' : 'libri'}</p>
+          <p className="text-lg"><strong className="text-title">{done} di {goal}</strong> {goal === 1 ? 'libro' : 'libri'}</p>
           <div role="progressbar" aria-label={`Obiettivo ${year}`} aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(done, goal)} aria-valuetext={`${done} di ${goal} libri (${pct}%)`} className="mt-2 h-4 overflow-hidden rounded-full bg-lilac-soft">
             <div className="h-full rounded-full bg-ok transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
           </div>

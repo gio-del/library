@@ -34,7 +34,7 @@ export function ReadPhotoButton({ getPhoto, onRead, disabled }: { getPhoto(): Pr
         <ScanText aria-hidden className="size-5" />{busy ? 'Leggo la copertina…' : 'Leggi i dati dalla foto'}
       </Button>
       {msg && <p role="status" className="mb-0 mt-2 text-sm text-muted">{msg}</p>}
-      {err && <p role="alert" className="mb-0 mt-2 text-sm text-ko">{err}</p>}
+      {err && <p role="alert" className="mb-0 mt-2 text-sm text-danger">{err}</p>}
     </div>
   );
 }

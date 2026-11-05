@@ -180,7 +180,7 @@ export function BookDetail() {
               {[...GENRES, ...picked.filter((g) => !GENRES.includes(g))].map((g) => {
                 const on = picked.includes(g);
                 return (
-                  <label key={g} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-sm font-medium ${on ? 'bg-gold text-plum' : 'bg-lilac-soft text-plum'}`}>
+                  <label key={g} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-sm font-medium ${on ? 'bg-gold text-on-gold' : 'bg-lilac-soft text-title'}`}>
                     <input type="checkbox" className="size-4" checked={on} disabled={!on && picked.length >= MAX_GENRES} onChange={() => setPicked(on ? picked.filter((x) => x !== g) : [...picked, g])} />
                     {g}
                   </label>
@@ -202,18 +202,18 @@ export function BookDetail() {
     );
   }
 
-  const tool = 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-lilac-soft px-2 text-sm font-medium text-plum';
+  const tool = 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-lilac-soft px-2 text-sm font-medium text-title';
   return (
     <SubPage title={bookTitle(book)} fallback="/libreria">
       <div className="flex flex-col gap-3">
         {book.cover && <CoverViewer src={`/covers/${book.cover}${coverV ? `?v=${coverV}` : ''}`} title={bookTitle(book)} className="mx-auto max-h-96 max-w-full rounded-lg shadow" />}
-        <h2 className="m-0 text-xl font-bold text-plum [overflow-wrap:anywhere]">{book.title || 'Titolo sconosciuto'}</h2>
+        <h2 className="m-0 text-xl font-bold text-title [overflow-wrap:anywhere]">{book.title || 'Titolo sconosciuto'}</h2>
         <span className="self-start"><Badge read={book.read} /></span>
         <Button disabled={busy} onClick={() => void patch(book.read ? { read: false } : { read: true, ...(book.readAt ? {} : { readAt: todayIso() }) }, '')} aria-pressed={!!book.read}>{book.read ? 'Segna come da leggere' : 'Segna come letto'}</Button>
         {book.read && (
           <div className="flex flex-col gap-2 rounded-xl bg-paper p-4 shadow-sm">
             <Stars value={ratingOf(book)} disabled={busy} onChange={(v) => void patch({ rating: v || null }, '')} />
-            <label className="text-sm font-medium text-plum" htmlFor="read-at">Finito di leggere il</label>
+            <label className="text-sm font-medium text-title" htmlFor="read-at">Finito di leggere il</label>
             <Input id="read-at" type="date" max={todayIso()} disabled={busy} value={book.readAt || ''} onChange={(e) => void patch({ readAt: e.target.value || null }, '')} />
           </div>
         )}
@@ -222,12 +222,12 @@ export function BookDetail() {
         <CoverPicker onPick={(f) => void changeCover(f)} />
         <div className="flex gap-2">
           <button type="button" className={tool} onClick={startEdit}><Pencil aria-hidden className="size-5" />Modifica</button>
-          <button type="button" className={`${tool} !bg-ko/10 text-ko`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>
+          <button type="button" className={`${tool} !bg-ko/10 text-danger`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>
         </div>
         {serie && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-paper p-4 shadow-sm">
             <p className="m-0 [overflow-wrap:anywhere]">Collana: {serie.total} libri, {serie.read} letti</p>
-            <button type="button" onClick={() => nav('/libreria', { state: { series: serie.name } })} className="min-h-11 rounded-full bg-lilac-soft px-4 font-medium text-plum">Vedi la collana</button>
+            <button type="button" onClick={() => nav('/libreria', { state: { series: serie.name } })} className="min-h-11 rounded-full bg-lilac-soft px-4 font-medium text-title">Vedi la collana</button>
           </div>
         )}
         <dl className="m-0 rounded-xl bg-paper p-4 shadow-sm">
@@ -236,7 +236,7 @@ export function BookDetail() {
               <dt className="text-sm text-muted">{k}</dt>
               {k === 'Autori' ? (
                 <dd className="m-0 flex flex-wrap gap-2 pt-1">
-                  {authorsOf(book).map((a) => <button key={a} type="button" onClick={() => nav('/libreria', { state: { author: a } })} aria-label={`Mostra i libri di ${a}`} className="min-h-11 max-w-full rounded-full bg-lilac-soft px-4 text-left font-medium text-plum [overflow-wrap:anywhere]">{a}</button>)}
+                  {authorsOf(book).map((a) => <button key={a} type="button" onClick={() => nav('/libreria', { state: { author: a } })} aria-label={`Mostra i libri di ${a}`} className="min-h-11 max-w-full rounded-full bg-lilac-soft px-4 text-left font-medium text-title [overflow-wrap:anywhere]">{a}</button>)}
                 </dd>
               ) : <dd className="m-0 [overflow-wrap:anywhere]">{v}</dd>}
             </div>

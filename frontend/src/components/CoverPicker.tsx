@@ -4,7 +4,7 @@ import { CameraSheet } from './CameraSheet';
 import { CropSheet } from './CropSheet';
 import { cn } from '../lib/cn';
 
-const tool = 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-lilac-soft px-2 text-center text-sm font-medium text-plum';
+const tool = 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-lilac-soft px-2 text-center text-sm font-medium text-title';
 
 // Due modi per dare una copertina: «Scegli dalla galleria» e «Scatta ora»; la foto passa sempre dal ritaglio.
 export function CoverPicker({ onPick, disabled, className, galleryLabel = 'Scegli dalla galleria' }: { onPick(f: Blob, name?: string): void; disabled?: boolean; className?: string; galleryLabel?: string }) {

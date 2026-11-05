@@ -72,16 +72,16 @@ export function Library() {
         </div>
         <div role="group" aria-label="Stato" className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-lilac-soft p-1">
           {STATES.map(([f, label]) => (
-            <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-plum')}>{label} ({count(f)})</button>
+            <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-title')}>{label} ({count(f)})</button>
           ))}
         </div>
         {(genre || series || author || minRating > 0 || q) && (
           <div data-testid="active-filters" className="mt-2 flex flex-wrap gap-2">
-            {q && <button type="button" onClick={() => setQuery('')} aria-label={`Togli il filtro Testo ${query.trim()}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">Testo {query.trim()}</span><X aria-hidden className="size-4 shrink-0" /></button>}
-            {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>}
-            {series && <button type="button" onClick={() => setSeries('')} aria-label={`Togli il filtro Collana ${series}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">Collana {series}</span><X aria-hidden className="size-4 shrink-0" /></button>}
-            {author && <button type="button" onClick={() => setAuthor('')} aria-label={`Togli il filtro Autore ${author}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0 [overflow-wrap:anywhere]">Autore {author}</span><X aria-hidden className="size-4 shrink-0" /></button>}
-            {minRating > 0 && <button type="button" onClick={() => setMinRating(0)} aria-label={`Togli il filtro Voto minimo ${minRating}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-plum"><span className="min-w-0">Voto minimo {minRating}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {q && <button type="button" onClick={() => setQuery('')} aria-label={`Togli il filtro Testo ${query.trim()}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Testo {query.trim()}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {series && <button type="button" onClick={() => setSeries('')} aria-label={`Togli il filtro Collana ${series}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Collana {series}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {author && <button type="button" onClick={() => setAuthor('')} aria-label={`Togli il filtro Autore ${author}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Autore {author}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {minRating > 0 && <button type="button" onClick={() => setMinRating(0)} aria-label={`Togli il filtro Voto minimo ${minRating}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0">Voto minimo {minRating}</span><X aria-hidden className="size-4 shrink-0" /></button>}
           </div>
         )}
       </div>
@@ -106,13 +106,13 @@ export function Library() {
         <p className="mb-2 text-sm font-medium text-muted">Ordina per</p>
         <div role="group" aria-label="Ordina per" className="mb-4 flex flex-col gap-2">
           {ORDERS.map(([o, label]) => (
-            <button key={o} type="button" aria-pressed={order === o} onClick={() => setOrder(o)} className={cn('flex min-h-12 items-center rounded-xl px-4 text-left font-medium', order === o ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{label}</button>
+            <button key={o} type="button" aria-pressed={order === o} onClick={() => setOrder(o)} className={cn('flex min-h-12 items-center rounded-xl px-4 text-left font-medium', order === o ? 'bg-plum text-white' : 'bg-lilac-soft text-title')}>{label}</button>
           ))}
         </div>
         <p className="mb-2 text-sm font-medium text-muted">Voto minimo</p>
         <div role="group" aria-label="Voto minimo" className="mb-4 grid grid-cols-3 gap-2">
           {[0, 1, 2, 3, 4, 5].map((n) => (
-            <button key={n} type="button" aria-pressed={minRating === n} onClick={() => setMinRating(n)} className={cn('min-h-12 rounded-xl px-2 text-center font-medium', minRating === n ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>{n ? `${n} ${n === 1 ? 'stella' : 'stelle'}` : 'Tutti'}</button>
+            <button key={n} type="button" aria-pressed={minRating === n} onClick={() => setMinRating(n)} className={cn('min-h-12 rounded-xl px-2 text-center font-medium', minRating === n ? 'bg-plum text-white' : 'bg-lilac-soft text-title')}>{n ? `${n} ${n === 1 ? 'stella' : 'stelle'}` : 'Tutti'}</button>
           ))}
         </div>
         <p className="mb-2 text-sm font-medium text-muted">Genere</p>
@@ -138,7 +138,7 @@ export function Library() {
             </div>
           </>
         )}
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setAuthor(''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-plum disabled:opacity-50">Azzera tutto</button>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setAuthor(''); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-title disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );
@@ -146,7 +146,7 @@ export function Library() {
 
 function GenreRow({ label, count, on, onPick }: { label: string; count: number; on: boolean; onPick(): void }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onPick} className={cn('flex min-h-12 items-center justify-between rounded-xl px-4 text-left', on ? 'bg-plum text-white' : 'bg-lilac-soft text-plum')}>
+    <button type="button" aria-pressed={on} onClick={onPick} className={cn('flex min-h-12 items-center justify-between rounded-xl px-4 text-left', on ? 'bg-plum text-white' : 'bg-lilac-soft text-title')}>
       <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{label}</span><span className={cn('ml-3 shrink-0 text-sm', on ? 'text-white/80' : 'text-muted')}>{count}</span>
     </button>
   );
