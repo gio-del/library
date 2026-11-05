@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const css = readFileSync(new URL('../index.css', import.meta.url), 'utf8');
+const css = readFileSync('src/index.css', 'utf8');
 
 function vars(block: string): Record<string, string> {
   const out: Record<string, string> = {};
