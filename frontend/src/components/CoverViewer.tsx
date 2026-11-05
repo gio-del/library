@@ -12,7 +12,7 @@ export function CoverViewer({ src, title, className }: { src: string; title: str
         <Dialog.Content
           aria-describedby={undefined}
           onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.querySelector<HTMLButtonElement>('[data-close]')?.click(); }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/95 px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+3.5rem))] motion-safe:animate-[fade-in_.2s_ease-out]"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/95 px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+3.5rem))] motion-safe:animate-[fade-in_.2s_ease-out]"
         >
           <Dialog.Title className="sr-only">Copertina di {title}</Dialog.Title>
           <img src={src} alt={`Copertina di ${title}`} className="max-h-full max-w-full object-contain" />

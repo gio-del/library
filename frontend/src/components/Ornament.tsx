@@ -10,7 +10,7 @@ export function Ornament({ variant = 'dark', className }: { variant?: 'dark' | '
       data-testid="ornament"
       aria-hidden="true"
       focusable="false"
-      className={cn('pointer-events-none block h-5 w-full max-w-full overflow-hidden', variant === 'dark' ? 'bg-plum text-gold' : 'bg-paper text-plum/40', className)}
+      className={cn('pointer-events-none block h-5 w-full max-w-full overflow-hidden', variant === 'dark' ? 'bg-plum text-gold' : 'bg-paper text-title/40', className)}
     >
       <defs>
         <pattern id={id} width="72" height="20" patternUnits="userSpaceOnUse" x="0">

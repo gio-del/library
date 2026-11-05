@@ -7,11 +7,11 @@ export function Sheet({ open, onOpenChange, title, children }: { open: boolean; 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/50" />
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim/50" />
         <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[80dvh] max-w-2xl flex-col rounded-t-2xl bg-paper pb-[env(safe-area-inset-bottom)] shadow-xl motion-safe:animate-[sheet-in_.2s_ease-out]">
           <div className="flex items-center justify-between px-4 pt-3">
-            <Dialog.Title className="text-lg font-bold text-plum">{title}</Dialog.Title>
-            <Dialog.Close className="flex size-11 items-center justify-center rounded-full text-plum" aria-label="Chiudi"><X aria-hidden /></Dialog.Close>
+            <Dialog.Title className="text-lg font-bold text-title">{title}</Dialog.Title>
+            <Dialog.Close className="flex size-11 items-center justify-center rounded-full text-title" aria-label="Chiudi"><X aria-hidden /></Dialog.Close>
           </div>
           <div className="overflow-y-auto px-4 pb-4">{children}</div>
         </Dialog.Content>

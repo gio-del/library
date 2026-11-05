@@ -23,7 +23,7 @@ export function BottomNav() {
       <ul className="m-0 mx-auto flex max-w-2xl list-none p-0">
         {TABS.map(([to, label, Icon]) => (
           <li key={to} className="flex-1">
-            <NavLink to={to} className={({ isActive }) => cn('flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium', isActive ? 'text-plum' : 'text-muted')}>
+            <NavLink to={to} className={({ isActive }) => cn('flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium', isActive ? 'text-title' : 'text-muted')}>
               {({ isActive }) => (
                 <>
                   <span className={cn('flex h-8 w-16 items-center justify-center rounded-full', isActive && 'bg-lilac-soft')}><Icon aria-hidden className={cn('size-6', isActive && 'stroke-[2.4]')} /></span>
@@ -83,7 +83,7 @@ export function TopBar() {
           <img src="/emblem.png" alt="" className="size-11 rounded-full bg-cream p-[3px]" />
         </Dialog.Trigger>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/70 motion-safe:animate-[fade-in_.2s_ease-out]" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim/70 motion-safe:animate-[fade-in_.2s_ease-out]" />
           <Dialog.Content aria-describedby={undefined} className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-cream p-4 shadow-[0_0_60px_20px_rgb(0_0_0/.55)] motion-safe:animate-[fade-in_.2s_ease-out]">
             <Dialog.Title className="sr-only">Logo della Libreria</Dialog.Title>
             <img src="/emblem.png" alt="Logo della Libreria" className="size-[min(80vw,24rem)] object-contain" />
@@ -99,15 +99,15 @@ export function TopBar() {
         <DropdownMenu.Portal>
           <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-60 rounded-xl bg-paper p-1.5 shadow-xl">
             <DropdownMenu.Label className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">Gestione</DropdownMenu.Label>
-            <DropdownMenu.Item className={item} asChild><Link to="/statistiche"><ChartNoAxesColumn aria-hidden className="size-5 text-plum" />Statistiche</Link></DropdownMenu.Item>
-            <DropdownMenu.Item className={item} asChild><Link to="/desideri"><Heart aria-hidden className="size-5 text-plum" />Desideri</Link></DropdownMenu.Item>
-            <DropdownMenu.Item className={item} onSelect={() => setAsk('classify')}><Tags aria-hidden className="size-5 text-plum" />Rileggi i generi</DropdownMenu.Item>
-            <DropdownMenu.Item className={item} disabled={missing === 0} onSelect={() => setCompleteOpen(true)}><RefreshCw aria-hidden className="size-5 text-plum" />Completa i dati mancanti<span className={missing > 0 ? 'ml-auto rounded-full bg-gold px-2 text-xs font-semibold text-plum' : 'ml-auto text-xs text-muted'}>{missing > 0 ? missing : 'nessun libro incompleto'}</span></DropdownMenu.Item>
-            <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=json" download><Download aria-hidden className="size-5 text-plum" />Esporta (JSON)</a></DropdownMenu.Item>
-            <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=csv" download><Download aria-hidden className="size-5 text-plum" />Esporta (CSV)</a></DropdownMenu.Item>
-            <DropdownMenu.Item className={item} onSelect={() => fileInput.current?.click()}><Upload aria-hidden className="size-5 text-plum" />Importa</DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><Link to="/statistiche"><ChartNoAxesColumn aria-hidden className="size-5 text-title" />Statistiche</Link></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><Link to="/desideri"><Heart aria-hidden className="size-5 text-title" />Desideri</Link></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} onSelect={() => setAsk('classify')}><Tags aria-hidden className="size-5 text-title" />Rileggi i generi</DropdownMenu.Item>
+            <DropdownMenu.Item className={item} disabled={missing === 0} onSelect={() => setCompleteOpen(true)}><RefreshCw aria-hidden className="size-5 text-title" />Completa i dati mancanti<span className={missing > 0 ? 'ml-auto rounded-full bg-gold px-2 text-xs font-semibold text-title' : 'ml-auto text-xs text-muted'}>{missing > 0 ? missing : 'nessun libro incompleto'}</span></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=json" download><Download aria-hidden className="size-5 text-title" />Esporta (JSON)</a></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} asChild><a href="/api/books/export?format=csv" download><Download aria-hidden className="size-5 text-title" />Esporta (CSV)</a></DropdownMenu.Item>
+            <DropdownMenu.Item className={item} onSelect={() => fileInput.current?.click()}><Upload aria-hidden className="size-5 text-title" />Importa</DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1.5 h-px bg-lilac/60" />
-            <DropdownMenu.Item className={item} onSelect={() => void logout()}><LogOut aria-hidden className="size-5 text-plum" />Esci</DropdownMenu.Item>
+            <DropdownMenu.Item className={item} onSelect={() => void logout()}><LogOut aria-hidden className="size-5 text-title" />Esci</DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>

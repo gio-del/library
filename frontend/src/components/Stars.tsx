@@ -15,10 +15,10 @@ export function Stars({ value, onChange, disabled }: { value: number; onChange: 
           onClick={() => onChange(n === value ? 0 : n)}
           className="flex size-11 items-center justify-center rounded-lg transition-transform active:scale-90 motion-reduce:transition-none motion-reduce:active:scale-100 disabled:opacity-60"
         >
-          <Star aria-hidden className={cn('size-7', n <= value ? 'fill-gold stroke-plum' : 'stroke-plum-2')} />
+          <Star aria-hidden className={cn('size-7', n <= value ? 'fill-gold stroke-title' : 'stroke-title-2')} />
         </button>
       ))}
-      <button type="button" disabled={disabled || !value} onClick={() => onChange(0)} className="min-h-11 rounded-lg bg-lilac-soft px-3 text-sm font-medium text-plum disabled:opacity-50">Senza voto</button>
+      <button type="button" disabled={disabled || !value} onClick={() => onChange(0)} className="min-h-11 rounded-lg bg-lilac-soft px-3 text-sm font-medium text-title disabled:opacity-50">Senza voto</button>
     </div>
   );
 }

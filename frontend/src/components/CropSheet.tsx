@@ -111,13 +111,13 @@ function Body({ photo, onUse, onCancel }: { photo: Blob; onUse(b: Blob): void; o
   const clip = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${r.x * 100}% ${r.y * 100}%, ${r.x * 100}% ${(r.y + r.h) * 100}%, ${(r.x + r.w) * 100}% ${(r.y + r.h) * 100}%, ${(r.x + r.w) * 100}% ${r.y * 100}%, ${r.x * 100}% ${r.y * 100}%)`;
   return (
     <div className="flex flex-col gap-3 py-3">
-      {error && <p role="alert" className="m-0 text-ko">{error}</p>}
+      {error && <p role="alert" className="m-0 text-danger">{error}</p>}
       {!img && !error && <p className="m-0 text-muted">Carico la foto…</p>}
       {img && (
         <div className="flex justify-center px-[22px]">
           <div ref={stage} data-testid="crop-stage" className="relative inline-block max-w-full touch-none select-none">
             <img src={img.url} alt="Foto da ritagliare" draggable={false} onError={() => { setImg(null); setError('Immagine non leggibile: scegline un\'altra.'); }} className="block max-h-[45dvh] max-w-full" />
-            <div aria-hidden className="pointer-events-none absolute inset-0 bg-ink/50" style={{ clipPath: clip }} />
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-scrim/50" style={{ clipPath: clip }} />
             <div
               role="group" aria-label="Riquadro di ritaglio" data-testid="crop-box"
               className="absolute cursor-move touch-none border-2 border-gold"
@@ -130,7 +130,7 @@ function Body({ photo, onUse, onCancel }: { photo: Blob; onUse(b: Blob): void; o
                   className={`absolute flex size-11 touch-none items-center justify-center ${c.cls}`}
                   onPointerDown={(e) => down(e, c.id)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
                 >
-                  <span className="size-4 rounded-full border-2 border-plum bg-gold" />
+                  <span className="size-4 rounded-full border-2 border-title bg-gold" />
                 </div>
               ))}
             </div>
