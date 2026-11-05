@@ -1,9 +1,10 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authorCounts, bookGenres, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks } from '../state/books';
+import { useLibraryView } from '../state/libraryView';
 import { Badge, Cover, Input, Msg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { LetterRail, type RailGroup } from '../components/LetterRail';
@@ -16,22 +17,35 @@ const MIN_RAIL = 12;
 
 export function Library() {
   const { books, loaded, load } = useBooks();
-  const [state, setState] = useState<ReadFilter>('all');
-  const [genre, setGenre] = useState('');
-  const [series, setSeries] = useState('');
-  const [author, setAuthor] = useState('');
-  const [incomplete, setIncomplete] = useState(false);
-  const [minRating, setMinRating] = useState(0);
-  const [order, setOrder] = useState<SortOrder>(DEFAULT_ORDER);
-  const [query, setQuery] = useState('');
+  const store = useLibraryView();
+  const { key, state: navState } = useLocation();
+  // Tornando dalla scheda di un libro (stessa voce di cronologia) si riprende da dove si era.
+  const saved = useRef(store.current?.key === key ? store.current : null).current;
+  const [state, setState] = useState<ReadFilter>(saved?.state ?? 'all');
+  const [genre, setGenre] = useState(saved?.genre ?? '');
+  const [series, setSeries] = useState(saved?.series ?? '');
+  const [author, setAuthor] = useState(saved?.author ?? '');
+  const [incomplete, setIncomplete] = useState(saved?.incomplete ?? false);
+  const [minRating, setMinRating] = useState(saved?.minRating ?? 0);
+  const [order, setOrder] = useState<SortOrder>(saved?.order ?? DEFAULT_ORDER);
+  const [query, setQuery] = useState(saved?.query ?? '');
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
-  const { key, state: navState } = useLocation();
+  const first = useRef(true);
+  const pendingScroll = useRef<number | null>(saved ? saved.scrollY : null);
+  const view = useRef<Omit<LibraryView, 'scrollY'>>({ key, state, genre, series, author, incomplete, minRating, order, query });
+  view.current = { key, state, genre, series, author, incomplete, minRating, order, query };
 
-  // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca e filtri.
+  // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca, filtri e posizione.
   // Dalla scheda del libro si arriva con l'autore scelto nello stato di navigazione.
-  useEffect(() => { setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (first.current) { first.current = false; if (saved) return; }
+    pendingScroll.current = null;
+    setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // All'uscita dalla Libreria si salvano i filtri e la posizione di scorrimento.
+  useLayoutEffect(() => () => { store.current = { ...view.current, scrollY: window.scrollY }; }, [store]);
 
   useEffect(() => { load().catch((e: Error & { status?: number }) => { if (e.status !== 401) setErr(e.message); }); }, [load]);
 
@@ -39,6 +53,11 @@ export function Library() {
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
   const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, author, incomplete, minRating, order]);
+  useEffect(() => {
+    if (pendingScroll.current === null || !loaded) return;
+    window.scrollTo({ top: pendingScroll.current });
+    pendingScroll.current = null;
+  }, [loaded, shown]);
   const groups = useMemo(() => groupStarts(shown, order), [shown, order]);
   const jump = (g: RailGroup) => {
     const el = document.getElementById(`libro-${g.isbn}`);

@@ -65,6 +65,31 @@ describe('app', () => {
     expect(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' })).toBeInTheDocument();
   });
 
+  it('tornando dalla scheda di un libro la Libreria ricorda ricerca, filtri e posizione; il titolo azzera', async () => {
+    server();
+    open('/libreria');
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' }), 'narnia');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(screen.getByRole('button', { name: /^4 stelle/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Voto' }));
+    await userEvent.keyboard('{Escape}');
+    window.scrollTo = vi.fn();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 240 });
+    await userEvent.click(await screen.findByRole('link', { name: /Narnia/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Indietro' }));
+    expect(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' })).toHaveValue('narnia');
+    expect(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Togli il filtro Testo narnia' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Filtri/ })).toBeInTheDocument();
+    await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith({ top: 240 }));
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    expect(screen.getByRole('button', { name: 'Voto' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^4 stelle/ })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
+    expect(screen.getByRole('searchbox', { name: 'Cerca nella libreria' })).toHaveValue('');
+    delete (window as { scrollY?: number }).scrollY;
+  });
+
   it('il logo apre un dialogo, che si chiude con X, Esc e tocco fuori', async () => {
     server();
     open('/libreria');
