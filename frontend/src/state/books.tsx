@@ -9,7 +9,12 @@ interface BooksValue {
   setAll(books: Book[]): void;
   upsert(book: Book): void;
   remove(isbn: string): void;
+  bulk(isbns: string[], action: BulkAction, value?: string): Promise<BulkResult>;
 }
+
+export type BulkAction = 'read' | 'unread' | 'addGenre' | 'delete';
+// done: libri cambiati; unchanged: già come richiesto (o senza posto per un altro genere); failed: non più presenti.
+export interface BulkResult { done: number; failed: number; unchanged: number }
 
 const Ctx = createContext<BooksValue | null>(null);
 
@@ -24,7 +29,15 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const upsert = useCallback((b: Book) => setBooks((cur) => (cur.some((x) => x.isbn === b.isbn) ? cur.map((x) => (x.isbn === b.isbn ? b : x)) : [...cur, b])), []);
   const remove = useCallback((isbn: string) => setBooks((cur) => cur.filter((x) => x.isbn !== isbn)), []);
 
-  const value = useMemo(() => ({ books, loaded, load, setAll: setBooks, upsert, remove }), [books, loaded, load, upsert, remove]);
+  const bulk = useCallback(async (isbns: string[], action: BulkAction, value?: string): Promise<BulkResult> => {
+    const r = await api<BulkResult & { books: Book[]; removed: string[] }>('POST', '/api/books/bulk', { isbns, action, ...(value === undefined ? {} : { value }) });
+    const upd = new Map(r.books.map((b) => [b.isbn, b]));
+    const gone = new Set(r.removed);
+    setBooks((cur) => cur.filter((b) => !gone.has(b.isbn)).map((b) => upd.get(b.isbn) ?? b));
+    return { done: r.done, failed: r.failed, unchanged: r.unchanged };
+  }, []);
+
+  const value = useMemo(() => ({ books, loaded, load, setAll: setBooks, upsert, remove, bulk }), [books, loaded, load, upsert, remove, bulk]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

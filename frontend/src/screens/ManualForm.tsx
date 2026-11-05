@@ -80,7 +80,7 @@ export function ManualForm() {
         {file && <p className="mb-0 mt-3 text-center text-sm text-muted">Copertina: {fileName}</p>}
         <CoverPicker className="my-3" onPick={(f, n) => { setFile(f); setFileName(n || ''); }} />
         {coverRead && file && <div className="mb-3"><ReadPhotoButton getPhoto={() => toJpeg(file)} onRead={applyRead} disabled={busy} /></div>}
-        {err && <p role="alert" className="text-ko">{err}</p>}
+        {err && <p role="alert" className="text-danger">{err}</p>}
         <div className="mt-4 flex flex-col gap-2">
           <Button type="submit" disabled={busy}>Salva</Button>
           <Button variant="ghost" onClick={() => nav('/scansiona')}>Annulla</Button>

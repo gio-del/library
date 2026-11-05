@@ -152,7 +152,7 @@ export function Scan() {
     <section className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-2xl bg-paper shadow-sm">
         <video ref={scanner.videoRef} playsInline muted hidden={!scanner.active} className="block aspect-[4/3] max-h-[32dvh] w-full bg-black object-cover" />
-        {!scanner.active && <p className="flex items-center justify-center gap-2 bg-lilac-soft py-6 text-plum"><Camera aria-hidden className="size-8" />Inquadra il codice a barre</p>}
+        {!scanner.active && <p className="flex items-center justify-center gap-2 bg-lilac-soft py-6 text-title"><Camera aria-hidden className="size-8" />Inquadra il codice a barre</p>}
         <div className="p-3">
           {scanner.active
             ? <Button key="close" variant="ghost" className="w-full" onClick={scanner.stop}>Chiudi la fotocamera</Button>
@@ -160,7 +160,7 @@ export function Scan() {
         </div>
       </div>
       <label className="flex min-h-11 items-center gap-3">
-        <input type="checkbox" role="switch" checked={continuous} className="size-6 accent-plum"
+        <input type="checkbox" role="switch" checked={continuous} className="size-6 accent-title"
           onChange={(e) => { setContinuous(e.target.checked); handled.current.clear(); setVerdict(null); setResults([]); say(''); }} />
         Scansione continua
       </label>
@@ -211,7 +211,7 @@ export function Scan() {
           ))}
         </ul>
       )}
-      <Link to="/scansiona/manuale" state={{ query }} className="flex min-h-11 items-center justify-center text-plum underline underline-offset-4">Non lo trovo: aggiungilo a mano</Link>
+      <Link to="/scansiona/manuale" state={{ query }} className="flex min-h-11 items-center justify-center text-title underline underline-offset-4">Non lo trovo: aggiungilo a mano</Link>
     </section>
   );
 }

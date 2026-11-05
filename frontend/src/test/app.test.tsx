@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import { AuthProvider } from '../state/auth';
 import type { Book } from '../lib/types';
-import { todayIso } from '../lib/books';
+import { todayIso, wishlistText } from '../lib/books';
 import { pacing } from '../hooks/useCompleteMissing';
 
 const BOOKS: Book[] = [
@@ -63,6 +63,29 @@ describe('app', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Note' }));
     await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
     expect(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' })).toBeInTheDocument();
+  });
+
+  it('tornando dalla scheda di un libro la Libreria ricorda ricerca, filtri e posizione; il titolo azzera', async () => {
+    server();
+    open('/libreria');
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' }), 'narnia');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Voto' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Genere' })).getByRole('button', { name: /Narrativa/ }));
+    window.scrollTo = vi.fn();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 240 });
+    await userEvent.click(await screen.findByRole('link', { name: /Narnia/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Indietro' }));
+    expect(await screen.findByRole('searchbox', { name: 'Cerca nella libreria' })).toHaveValue('narnia');
+    expect(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Togli il filtro Testo narnia' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Togli il filtro Narrativa' })).toBeInTheDocument();
+    await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith({ top: 240 }));
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    expect(screen.getByRole('button', { name: 'Voto' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('link', { name: 'Torna alla Libreria' }));
+    expect(screen.getByRole('searchbox', { name: 'Cerca nella libreria' })).toHaveValue('');
+    delete (window as { scrollY?: number }).scrollY;
   });
 
   it('il logo apre un dialogo, che si chiude con X, Esc e tocco fuori', async () => {
@@ -163,6 +186,35 @@ describe('app', () => {
     expect(screen.getByRole('searchbox')).toHaveValue('');
   });
 
+  it('il filtro «Da completare» mostra i libri con dati mancanti, si combina con gli altri e si toglie dal chip', async () => {
+    const full = { cover: 'c.jpg', publisher: 'Einaudi', year: '2001' };
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Completo', authors: ['Rossi'], ...full },
+      { isbn: '9780306406164', title: 'SenzaAnno', authors: ['Rossi'], ...full, year: '' },
+      { isbn: '9780306406171', title: 'SenzaCopertina', authors: ['Bianchi'], ...full, cover: null, read: true },
+    ] });
+    open('/libreria');
+    await screen.findByText('Completo');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const group = within(await screen.findByRole('group', { name: 'Dati mancanti' }));
+    expect(group.getByRole('button', { name: /^Da completare/ })).toHaveTextContent('2');
+    await userEvent.click(group.getByRole('button', { name: /^Da completare/ }));
+    expect(screen.queryByText('Completo')).not.toBeInTheDocument();
+    expect(screen.getByText('SenzaAnno')).toBeInTheDocument();
+    expect(screen.getAllByText('SenzaCopertina').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('filter-dot')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
+    expect(screen.queryByText('SenzaAnno')).not.toBeInTheDocument();
+    expect(screen.getAllByText('SenzaCopertina').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: /^Tutti/ }));
+    await userEvent.type(screen.getByRole('searchbox'), 'senzaanno');
+    expect(screen.queryByText('SenzaCopertina')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Da completare' }));
+    expect(screen.getByText('Completo')).toBeInTheDocument();
+    expect(screen.queryByTestId('filter-dot')).not.toBeInTheDocument();
+  });
+
   it('il foglio Filtri sceglie il genere, mostra il puntino e si azzera', async () => {
     server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Sapiens', authors: ['Harari'], genres: ['Saggio'], cover: 'c.jpg' }] });
     open('/libreria');
@@ -209,7 +261,7 @@ describe('app', () => {
     expect(titles()[0]).toContain('Mansfield');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     let group = await screen.findByRole('group', { name: 'Ordina per' });
-    expect(within(group).getAllByRole('button')).toHaveLength(4);
+    expect(within(group).getAllByRole('button')).toHaveLength(6);
     expect(within(group).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Azzera tutto' })).toBeDisabled();
     await userEvent.click(within(group).getByRole('button', { name: 'Aggiunti di recente' }));
@@ -228,6 +280,30 @@ describe('app', () => {
     expect(titles()[0]).toContain('Mansfield');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     expect(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('il foglio Filtri ordina per data di lettura e per anno, con i libri senza valore in fondo', async () => {
+    window.innerWidth = 390;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Alfa', authors: ['A'], cover: 'a.jpg', added: '2026-01-01', read: true, readAt: '2026-01-10', year: 1999 },
+      { isbn: '9780306406164', title: 'Beta', authors: ['B'], cover: 'b.jpg', added: '2026-02-01' , year: 'boh' },
+      { isbn: '9780306406171', title: 'Gamma', authors: ['C'], cover: 'c.jpg', added: '2026-03-01', read: true, readAt: '2026-05-02', year: 2020 },
+    ] });
+    open('/libreria');
+    await screen.findByText('Alfa');
+    const titles = () => screen.getAllByRole('link', { name: /Alfa|Beta|Gamma/ }).map((a) => a.textContent);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    let group = await screen.findByRole('group', { name: 'Ordina per' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Letti di recente' }));
+    expect(within(group).getByRole('button', { name: 'Letti di recente' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(titles().map((t) => t!.match(/Alfa|Beta|Gamma/)![0])).toEqual(['Gamma', 'Alfa', 'Beta']);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    group = await screen.findByRole('group', { name: 'Ordina per' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Anno di pubblicazione' }));
+    expect(within(group).getByRole('button', { name: 'Anno di pubblicazione' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Azzera tutto' }));
+    expect(titles()[0]).toContain('Alfa');
   });
 
   it('il foglio Filtri ordina per voto e filtra per voto minimo con chip', async () => {
@@ -285,6 +361,48 @@ describe('app', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Azzera tutto' }));
     expect(titles()).toHaveLength(3);
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+
+  it('il foglio Filtri filtra per lingua ed editore, con chip e azzeramento', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Austen'], cover: 'a.jpg', added: '2026-03-01', language: 'en', publisher: 'Penguin' },
+      { isbn: '9780306406164', title: 'Il leone', authors: ['Lewis'], cover: 'b.jpg', added: '2026-02-01', language: 'it', publisher: 'Mondadori' },
+      { isbn: '9780306406171', title: 'Caspian', authors: ['Lewis'], cover: 'c.jpg', added: '2026-01-01', language: ' IT ', publisher: 'mondadori' },
+    ] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const titles = () => screen.getAllByRole('link', { name: /Mansfield|leone|Caspian/ }).map((a) => a.textContent);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const lang = within(await screen.findByRole('group', { name: 'Lingua' }));
+    expect(lang.getByRole('button', { name: /^it/ })).toHaveTextContent('2');
+    await userEvent.click(lang.getByRole('button', { name: /^it/ }));
+    expect(titles()).toHaveLength(2);
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    const chip = screen.getByRole('button', { name: 'Togli il filtro Lingua it' });
+    await userEvent.click(chip);
+    expect(titles()).toHaveLength(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Editore' })).getByRole('button', { name: /^Penguin/ }));
+    expect(titles()).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Togli il filtro Editore Penguin' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Azzera tutto' }));
+    expect(titles()).toHaveLength(3);
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+
+  it('con un solo valore di lingua o editore le sezioni non compaiono', async () => {
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Austen'], cover: 'a.jpg', language: 'it', publisher: 'Penguin' },
+      { isbn: '9780306406164', title: 'Il leone', authors: ['Lewis'], cover: 'b.jpg', language: 'IT', publisher: 'penguin' },
+    ] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await screen.findByRole('group', { name: 'Genere' });
+    expect(screen.queryByRole('group', { name: 'Lingua' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Editore' })).not.toBeInTheDocument();
   });
 
   it('senza libri con collana il foglio Filtri non mostra la sezione Collana', async () => {
@@ -367,6 +485,26 @@ describe('app', () => {
     await screen.findByRole('heading', { name: 'Statistiche' });
     await screen.findByRole('progressbar', { name: 'Libri letti' });
     expect(screen.queryByRole('heading', { name: 'Autori' })).toBeNull();
+  });
+
+  it('Statistiche: lingue ed editori, nascosti senza dati', async () => {
+    server({ 'GET /api/books': [
+      { ...BOOKS[0], language: 'Italiano', publisher: 'Einaudi' },
+      { ...BOOKS[1], language: 'italiano', publisher: ' EINAUDI' },
+    ] });
+    open('/statistiche');
+    expect(await screen.findByRole('heading', { name: 'Lingue' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Italiano: 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Editori più presenti' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Einaudi: 2' })).toBeInTheDocument();
+  });
+
+  it('Statistiche: senza lingua né editore i blocchi non compaiono', async () => {
+    server({ 'GET /api/books': [{ ...BOOKS[0], language: '', publisher: '' }] });
+    open('/statistiche');
+    await screen.findByRole('progressbar', { name: 'Libri letti' });
+    expect(screen.queryByRole('heading', { name: 'Lingue' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Editori più presenti' })).toBeNull();
   });
 
   it('Statistiche con libreria vuota mostra un messaggio', async () => {
@@ -752,6 +890,58 @@ describe('app', () => {
       expect(l).toHaveAttribute('rel', 'noopener noreferrer');
       expect(l.className).toContain('min-h-11');
     }
+  });
+
+  it('wishlistText: una riga per desiderio, ISBN se manca il titolo', () => {
+    expect(wishlistText([
+      { isbn: '9780804429573', title: 'Dune', authors: ['Frank Herbert', 'X'] },
+      { isbn: 'm42', title: 'Solo titolo', authors: [] },
+      { isbn: '9788817152754', title: '', authors: ['Nessuno'] },
+    ])).toBe('Dune — Frank Herbert, X (9780804429573)\nSolo titolo (m42)\n9788817152754');
+    expect(wishlistText([])).toBe('');
+  });
+
+  describe('condividi i desideri', () => {
+    const wish = [{ isbn: '9780804429573', title: 'Dune', authors: ['Frank Herbert'], cover: null }];
+    const stub = (list: unknown[]) => vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const ok = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      if (url === '/api/auth/status') return ok({ authenticated: true });
+      if (url === '/api/books') return ok(BOOKS);
+      if (url === '/api/wishlist') return ok(list);
+      return ok({ error: 'Non trovato' }, 404);
+    }));
+    afterEach(() => {
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    });
+
+    it('con navigator.share apre il foglio di condivisione', async () => {
+      window.innerWidth = 360;
+      const share = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+      stub(wish);
+      open('/desideri');
+      await userEvent.click(await screen.findByRole('button', { name: 'Condividi la lista' }));
+      expect(share).toHaveBeenCalledWith({ title: 'Lista dei desideri', text: 'Dune — Frank Herbert (9780804429573)' });
+    });
+
+    it('senza navigator.share copia negli appunti e avvisa', async () => {
+      window.innerWidth = 360;
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      stub(wish);
+      open('/desideri');
+      await userEvent.click(await screen.findByRole('button', { name: 'Condividi la lista' }));
+      expect(writeText).toHaveBeenCalledWith('Dune — Frank Herbert (9780804429573)');
+      expect(await screen.findByText('Copiato')).toBeInTheDocument();
+    });
+
+    it('con la lista vuota il pulsante è disattivato', async () => {
+      stub([]);
+      open('/desideri');
+      expect(await screen.findByRole('button', { name: 'Condividi la lista' })).toBeDisabled();
+    });
   });
 
   it('«Cerca di nuovo i dati» su un ISBN non trovato lascia un messaggio che resta', async () => {

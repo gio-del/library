@@ -2,6 +2,9 @@ import type { Book } from './types';
 
 export const hasIsbn = (b: Book) => /^\d{13}$/.test(b.isbn);
 export const needsRetry = (b: Book) => hasIsbn(b) && (b.lookup === 'failed' || !b.cover);
+/** Manca almeno uno tra copertina, autori, editore e anno. */
+export const isIncomplete = (b: Book) =>
+  !b.cover || authorsOf(b).length === 0 || !(typeof b.publisher === 'string' && b.publisher.trim()) || !(typeof b.year === 'number' ? Number.isFinite(b.year) && b.year !== 0 : typeof b.year === 'string' && b.year.trim());
 // Ricerca su Amazon: per ISBN-13, altrimenti (codice manuale) per titolo e autori. Solo testo pubblico del libro.
 export function amazonSearchUrl(item: { isbn: string; title?: string; authors?: string[] }): string {
   const q = /^\d{13}$/.test(item.isbn) ? item.isbn : [item.title, ...(item.authors || [])].filter(Boolean).join(' ') || item.isbn;
@@ -54,6 +57,26 @@ export function seriesCounts(books: Book[], f: ReadFilter, selected: string): [s
   if (selected && !counts.has(selected)) counts.set(selected, 0);
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
 }
+
+export const languageOf = (b: Book) => (typeof b.language === 'string' ? b.language.trim().replace(/\s+/g, ' ') : '');
+export const publisherOf = (b: Book) => (typeof b.publisher === 'string' ? b.publisher.trim().replace(/\s+/g, ' ') : '');
+
+function valueCounts(books: Book[], f: ReadFilter, selected: string, of: (b: Book) => string): [string, number][] {
+  const counts = new Map<string, [string, number]>();
+  for (const b of books.filter((x) => matchRead(x, f))) {
+    const v = of(b);
+    if (!v) continue;
+    const e = counts.get(norm(v)) || [v, 0];
+    e[1]++;
+    counts.set(norm(v), e);
+  }
+  if (selected && !counts.has(norm(selected))) counts.set(norm(selected), [selected, 0]);
+  return [...counts.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
+}
+
+/** Lingue dei libri con i conteggi (senza distinguere maiuscole, spazi o accenti); i valori vuoti si ignorano. */
+export const languageCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, languageOf);
+export const publisherCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, publisherOf);
 
 export const authorsOf = (b: Book): string[] => (Array.isArray(b.authors) ? b.authors : []).filter((a): a is string => typeof a === 'string' && !!a.trim()).map((a) => a.trim());
 export const hasAuthor = (b: Book, author: string) => authorsOf(b).some((a) => norm(a) === norm(author));
@@ -113,7 +136,16 @@ export function sameWork(a: Partial<Book>, b: Partial<Book>): boolean {
 export const findOtherEdition = (books: Book[], candidate: Partial<Book>): Book | undefined =>
   books.find((b) => b.isbn !== candidate.isbn && sameWork(b, candidate));
 
-export type SortOrder = 'recent' | 'title' | 'author' | 'rating';
+export type SortOrder = 'recent' | 'read' | 'year' | 'title' | 'author' | 'rating';
+
+/** Anno di pubblicazione numerico (intero a 1-4 cifre, anche come testo), altrimenti null. */
+export function yearOf(b: Book): number | null {
+  const y: unknown = b.year;
+  if (typeof y === 'number') return Number.isInteger(y) && y > 0 && y < 10000 ? y : null;
+  return typeof y === 'string' && /^\d{1,4}$/.test(y.trim()) && Number(y) > 0 ? Number(y.trim()) : null;
+}
+/** Data di lettura `AAAA-MM-GG`, altrimenti null. */
+export const readAtOf = (b: Book): string | null => (typeof b.readAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.readAt) ? b.readAt : null);
 export const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // Chiave d'ordine dell'autore: «cognome nome». Cognome = ultima parola con le particelle che la precedono («de», «van», «Le»…);
@@ -142,6 +174,15 @@ export function sortBooks(books: Book[], order: SortOrder): Book[] {
       const x = ratingOf(a), y = ratingOf(b);
       return x && y ? y - x : x ? -1 : y ? 1 : 0;
     }
+    if (order === 'read') {
+      const x = readAtOf(a), y = readAtOf(b);
+      if (!x || !y) return x ? -1 : y ? 1 : 0;
+      return x < y ? 1 : x > y ? -1 : 0;
+    }
+    if (order === 'year') {
+      const x = yearOf(a), y = yearOf(b);
+      return x && y ? y - x : x ? -1 : y ? 1 : 0;
+    }
     if (order === 'recent') {
       if (!a.added || !b.added) return a.added ? -1 : b.added ? 1 : 0;
       return a.added < b.added ? 1 : a.added > b.added ? -1 : 0;
@@ -157,6 +198,8 @@ export interface LibraryStats {
   read: number;
   toRead: number;
   genres: [string, number][];
+  languages: [string, number][];
+  publishers: [string, number][];
   months: { key: string; label: string; count: number }[];
   readMonths: { key: string; label: string; count: number }[];
   rated: number;
@@ -165,6 +208,21 @@ export interface LibraryStats {
 
 export const STATS_GENRES = 8;
 export const STATS_MONTHS = 6;
+export const STATS_PUBLISHERS = 5;
+
+// Conta i valori testuali con nome normalizzato (maiuscole e spazi ignorati); vuoti esclusi; si mostra la prima forma incontrata.
+export function countField(books: Book[], field: 'language' | 'publisher'): [string, number][] {
+  const m = new Map<string, [string, number]>();
+  for (const b of books) {
+    const v = b[field];
+    const label = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '';
+    if (!label) continue;
+    const k = label.toLowerCase();
+    const e = m.get(k);
+    if (e) e[1]++; else m.set(k, [label, 1]);
+  }
+  return [...m.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
+}
 
 // Stessi conteggi della Libreria (matchRead, genreCounts); i mesi sono gli ultimi 6 fino a `now`, in ora locale.
 export function libraryStats(books: Book[], now: Date): LibraryStats {
@@ -192,6 +250,8 @@ export function libraryStats(books: Book[], now: Date): LibraryStats {
     read: books.filter((b) => matchRead(b, 'read')).length,
     toRead: books.filter((b) => matchRead(b, 'toread')).length,
     genres: genreCounts(books, 'all', '').slice(0, STATS_GENRES),
+    languages: countField(books, 'language'),
+    publishers: countField(books, 'publisher').slice(0, STATS_PUBLISHERS),
     months,
     readMonths,
     rated: ratings.length,
@@ -202,6 +262,11 @@ export function libraryStats(books: Book[], now: Date): LibraryStats {
 /** Etichetta del gruppo per lo scorrimento a lettere: iniziale della chiave d'ordine, mese per «recenti», `#` per il resto; `null` = niente scorrimento (voto). */
 export function groupLabel(b: Book, order: SortOrder): string | null {
   if (order === 'rating') return null;
+  if (order === 'year') return String(yearOf(b) ?? '#');
+  if (order === 'read') {
+    const r = readAtOf(b);
+    return r ? new Date(Number(r.slice(0, 4)), Number(r.slice(5, 7)) - 1, 1).toLocaleDateString('it', { month: 'short', year: 'numeric' }) : '#';
+  }
   if (order === 'recent') {
     const d = b.added ? new Date(b.added) : null;
     return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('it', { month: 'short', year: 'numeric' }) : '#';
@@ -219,4 +284,14 @@ export function groupStarts(sorted: Book[], order: SortOrder): { label: string; 
     if (label !== null && out[out.length - 1]?.label !== label) out.push({ label, isbn: b.isbn });
   }
   return out;
+}
+
+/** Testo da condividere: un desiderio per riga, «Titolo — Autori (ISBN)»; senza titolo solo l'ISBN. */
+export function wishlistText(items: { isbn: string; title?: string; authors?: string[] }[]): string {
+  return items.map((w) => {
+    const title = typeof w.title === 'string' ? w.title.trim() : '';
+    if (!title) return w.isbn;
+    const authors = (Array.isArray(w.authors) ? w.authors : []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim()).join(', ');
+    return `${title}${authors ? ` — ${authors}` : ''} (${w.isbn})`;
+  }).join('\n');
 }

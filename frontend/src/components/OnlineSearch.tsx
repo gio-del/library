@@ -60,7 +60,7 @@ export function OnlineSearch({ title, author, onPick, className }: { title: stri
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {found.map((c, i) => (
               <li key={`${c.isbn}${i}`}>
-                <button type="button" onClick={() => choose(c)} className="block min-h-11 w-full rounded-xl bg-lilac-soft px-3 py-2 text-left text-plum">
+                <button type="button" onClick={() => choose(c)} className="block min-h-11 w-full rounded-xl bg-lilac-soft px-3 py-2 text-left text-title">
                   <span className="block font-semibold [overflow-wrap:anywhere]">{c.title}</span>
                   <span className="block text-sm [overflow-wrap:anywhere]">{[c.authors.join(', '), c.publisher, c.year].filter(Boolean).join(' · ') || 'Dati non disponibili'}</span>
                   <span className="block text-xs text-muted">{SOURCES[c.source] || c.source}{c.isbn ? ` · ISBN ${c.isbn}` : ''}</span>

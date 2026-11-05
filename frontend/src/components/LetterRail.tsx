@@ -42,8 +42,8 @@ export function LetterRail({ groups, letters, onJump }: { groups: RailGroup[]; l
           if (d) { e.preventDefault(); pick(Math.max(active, 0) + d); release(); }
         }}
       >
-        {letters && groups.map((g, i) => <span key={g.label} aria-hidden className={cn('text-center text-[10px] font-semibold leading-none', i === active ? 'text-plum' : 'text-muted')}>{g.label}</span>)}
-        {!letters && <span aria-hidden className="mx-auto my-auto h-full w-1 rounded-full bg-plum/30" />}
+        {letters && groups.map((g, i) => <span key={g.label} aria-hidden className={cn('text-center text-[10px] font-semibold leading-none', i === active ? 'text-title' : 'text-muted')}>{g.label}</span>)}
+        {!letters && <span aria-hidden className="mx-auto my-auto h-full w-1 rounded-full bg-title/30" />}
       </div>
       {bubble && current && (
         <div aria-hidden data-testid="letter-bubble" className="pointer-events-none fixed left-1/2 top-1/2 z-30 flex min-h-20 min-w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-plum px-4 text-4xl font-bold text-white shadow-lg">{current.label}</div>

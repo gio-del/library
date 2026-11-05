@@ -73,7 +73,7 @@ function Body({ onPhoto, onClose }: { onPhoto(b: Blob): void; onClose(): void })
   if (state === 'error') {
     return (
       <div className="flex flex-col gap-3 py-3">
-        <p role="alert" className="m-0 text-ko">{msg}</p>
+        <p role="alert" className="m-0 text-danger">{msg}</p>
         <Button variant="ghost" onClick={onClose}>Chiudi</Button>
       </div>
     );
@@ -81,7 +81,7 @@ function Body({ onPhoto, onClose }: { onPhoto(b: Blob): void; onClose(): void })
   return (
     <div className="flex flex-col gap-3 py-3">
       {state === 'wait' && <p className="m-0 text-muted">Accendo la fotocamera…</p>}
-      <video ref={videoRef} playsInline muted aria-label="Anteprima della fotocamera" className={state === 'live' ? 'max-h-[50dvh] w-full rounded-lg bg-ink' : 'hidden'} />
+      <video ref={videoRef} playsInline muted aria-label="Anteprima della fotocamera" className={state === 'live' ? 'max-h-[50dvh] w-full rounded-lg bg-scrim' : 'hidden'} />
       <canvas ref={canvasRef} aria-label="Foto scattata" className={state === 'shot' ? 'max-h-[50dvh] w-full rounded-lg object-contain' : 'hidden'} />
       {state === 'live' && <Button onClick={shoot}>Scatta</Button>}
       {state === 'shot' && (

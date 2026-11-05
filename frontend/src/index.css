@@ -15,7 +15,36 @@
   --color-muted: #5e5266;
   --color-ok: #2e7d32;
   --color-ko: #a53b3b;
+  --color-title: #492151;
+  --color-danger: #a53b3b;
+  --color-field: #ffffff;
+  --color-scrim: #22172a;
+  --color-on-gold: #492151;
   --font-script: 'Dancing Script', 'Segoe Script', 'Brush Script MT', cursive;
+}
+
+/* Tema scuro: segue il telefono (prefers-color-scheme). Stessi colori del logo, riadattati; i ruoli (title, danger, scrim) cambiano valore, non nome. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-plum: #4a2356;
+    --color-plum-2: #6b3a78;
+    --color-blue: #3a65ac;
+    --color-lilac: #7d62b0;
+    --color-lilac-soft: #2e2040;
+    --color-gold: #e4c08e;
+    --color-cream: #150f1b;
+    --color-paper: #20162a;
+    --color-ink: #f1eaf7;
+    --color-muted: #b9adc6;
+    --color-ok: #2e7d32;
+    --color-ko: #a53b3b;
+    --color-title: #d6c3f0;
+    --color-danger: #f29a9a;
+    --color-field: #150f1b;
+    --color-scrim: #08050b;
+    --color-on-gold: #492151;
+    color-scheme: dark;
+  }
 }
 
 html { background: var(--color-cream); }

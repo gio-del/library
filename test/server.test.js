@@ -621,3 +621,29 @@ test('«Cerca di nuovo» su un libro senza dati non sovrascrive i campi compilat
   assert.strictEqual(r.book.lookup, undefined);
   assert.strictEqual(r.book.cover, `${isbn}.jpg`);
 });
+
+test('POST /api/books/bulk: segna letti, genere, elimina; input non validi', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  const c = await login();
+  const A = '9780306406157', B = '9780306406164';
+  fs.writeFileSync(path.join(dataDir, 'books.json'), JSON.stringify([
+    { isbn: A, title: 'A', authors: [], genres: ['x'], cover: 'a.jpg' },
+    { isbn: B, title: 'B', authors: [], genres: ['1', '2', '3', '4', '5'], read: false },
+  ]));
+  assert.strictEqual((await call('POST', '/api/books/bulk', { isbns: [A], action: 'boh' }, c)).status, 400);
+  assert.strictEqual((await call('POST', '/api/books/bulk', { isbns: [], action: 'read' }, c)).status, 400);
+  assert.strictEqual((await call('POST', '/api/books/bulk', { isbns: ['../x'], action: 'read' }, c)).status, 400);
+  assert.strictEqual((await call('POST', '/api/books/bulk', { isbns: [A], action: 'addGenre' }, c)).status, 400);
+  assert.strictEqual((await call('POST', '/api/books/bulk', { isbns: [A] , action: 'read' })).status, 401);
+  let r = await (await call('POST', '/api/books/bulk', { isbns: [A, B, '9780000000002'], action: 'read' }, c)).json();
+  assert.deepStrictEqual([r.done, r.failed, r.unchanged], [2, 1, 0]);
+  const list = await (await call('GET', '/api/books', undefined, c)).json();
+  assert.ok(list.every((b) => b.read && /^\d{4}-\d\d-\d\d$/.test(b.readAt)));
+  r = await (await call('POST', '/api/books/bulk', { isbns: [A, B], action: 'addGenre', value: 'Giallo' }, c)).json();
+  assert.deepStrictEqual([r.done, r.unchanged], [1, 1]); // B ha già 5 generi
+  r = await (await call('POST', '/api/books/bulk', { isbns: [A, B], action: 'unread' }, c)).json();
+  assert.strictEqual(r.done, 2);
+  r = await (await call('POST', '/api/books/bulk', { isbns: [A, B], action: 'delete' }, c)).json();
+  assert.deepStrictEqual(r.removed.sort(), [A, B]);
+  assert.deepStrictEqual(await (await call('GET', '/api/books', undefined, c)).json(), []);
+});

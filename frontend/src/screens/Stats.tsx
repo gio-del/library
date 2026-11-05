@@ -12,7 +12,7 @@ function Bar({ label, count, max, total }: { label: string; count: number; max: 
     <li className="grid grid-cols-[minmax(0,6.5rem)_1fr_2rem] items-center gap-2 text-sm">
       <span className="truncate">{label}</span>
       <div role="img" aria-label={text} className="h-3 overflow-hidden rounded-full bg-lilac-soft">
-        <div className="h-full rounded-full bg-plum" style={{ width: `${max ? (count / max) * 100 : 0}%` }} />
+        <div className="h-full rounded-full bg-title" style={{ width: `${max ? (count / max) * 100 : 0}%` }} />
       </div>
       <span className="text-right font-semibold tabular-nums" aria-hidden>{count}</span>
     </li>
@@ -35,7 +35,7 @@ export function Stats() {
           <YearGoal year={now.getFullYear()} done={readInYear(books, now.getFullYear())} />
           <section aria-labelledby="st-tot">
             <h2 id="st-tot" className={h}>Libri</h2>
-            <p className="text-3xl font-bold text-plum">{s.total} <span className="text-base font-medium text-ink">{s.total === 1 ? 'libro' : 'libri'}</span></p>
+            <p className="text-3xl font-bold text-title">{s.total} <span className="text-base font-medium text-ink">{s.total === 1 ? 'libro' : 'libri'}</span></p>
             <p className="mt-1 text-sm">Letti: <strong>{s.read}</strong> · Da leggere: <strong>{s.toRead}</strong></p>
             <div role="progressbar" aria-label="Libri letti" aria-valuemin={0} aria-valuemax={s.total} aria-valuenow={s.read} aria-valuetext={`${s.read} letti su ${s.total} (${pct}%)`} className="mt-2 h-4 overflow-hidden rounded-full bg-lilac-soft">
               <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
@@ -46,13 +46,25 @@ export function Stats() {
             <h2 id="st-gen" className={h}>Generi più frequenti</h2>
             <ul className="space-y-2">{s.genres.map(([g, n]) => <Bar key={g} label={g} count={n} max={s.genres[0][1]} total={s.total} />)}</ul>
           </section>
+          {s.languages.length > 0 && (
+            <section aria-labelledby="st-lin">
+              <h2 id="st-lin" className={h}>Lingue</h2>
+              <ul className="space-y-2">{s.languages.map(([n, c]) => <Bar key={n} label={n} count={c} max={s.languages[0][1]} />)}</ul>
+            </section>
+          )}
+          {s.publishers.length > 0 && (
+            <section aria-labelledby="st-edi">
+              <h2 id="st-edi" className={h}>Editori più presenti</h2>
+              <ul className="space-y-2">{s.publishers.map(([n, c]) => <Bar key={n} label={n} count={c} max={s.publishers[0][1]} />)}</ul>
+            </section>
+          )}
           {authors.length > 0 && (
             <section aria-labelledby="st-aut">
               <h2 id="st-aut" className={h}>Autori</h2>
               <ul className="space-y-2">
                 {authors.map((a) => (
                   <li key={a.name}>
-                    <button type="button" onClick={() => nav('/libreria', { state: { author: a.name } })} aria-label={`Mostra i libri di ${a.name}`} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl bg-lilac-soft px-4 py-2 text-left text-plum">
+                    <button type="button" onClick={() => nav('/libreria', { state: { author: a.name } })} aria-label={`Mostra i libri di ${a.name}`} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl bg-lilac-soft px-4 py-2 text-left text-title">
                       <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{a.name}</span>
                       <span className="shrink-0 text-sm">{a.books} libri · {a.read} letti</span>
                     </button>
@@ -64,7 +76,7 @@ export function Stats() {
           <section aria-labelledby="st-voto">
             <h2 id="st-voto" className={h}>Voti</h2>
             {s.avgRating === null ? <p className="text-sm text-muted">Nessun voto ancora.</p> : (
-              <p className="text-sm">Voto medio: <strong className="text-2xl text-plum">{s.avgRating.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</strong> su 5 · {s.rated} {s.rated === 1 ? 'libro votato' : 'libri votati'}</p>
+              <p className="text-sm">Voto medio: <strong className="text-2xl text-title">{s.avgRating.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</strong> su 5 · {s.rated} {s.rated === 1 ? 'libro votato' : 'libri votati'}</p>
             )}
           </section>
           <section aria-labelledby="st-letti">

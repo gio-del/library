@@ -21,16 +21,16 @@ export function CompleteSheet({ open, onOpenChange, c }: { open: boolean; onOpen
         )}
         {phase === 'running' && (
           <>
-            <p role="status" className="font-semibold text-plum">{progress.done} di {progress.total}</p>
+            <p role="status" className="font-semibold text-title">{progress.done} di {progress.total}</p>
             <div role="progressbar" aria-label="Avanzamento" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done} className="h-2 overflow-hidden rounded-full bg-lilac-soft">
-              <div className="h-full bg-plum" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+              <div className="h-full bg-title" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
             </div>
             <Button variant="danger" onClick={c.halt}>Ferma</Button>
           </>
         )}
         {phase === 'done' && (
           <>
-            <p role="status" className="font-semibold text-plum">{stopped ? `Fermato dopo ${progress.done} di ${progress.total}` : `Finito: ${progress.total} ${progress.total === 1 ? 'libro elaborato' : 'libri elaborati'}`}</p>
+            <p role="status" className="font-semibold text-title">{stopped ? `Fermato dopo ${progress.done} di ${progress.total}` : `Finito: ${progress.total} ${progress.total === 1 ? 'libro elaborato' : 'libri elaborati'}`}</p>
             <ul className="m-0 list-none p-0 text-ink">
               <li>Completati: {summary.completed}</li>
               <li>Ancora incompleti: {summary.incomplete}</li>

@@ -1,4 +1,4 @@
-import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
+import { groupLabel, amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, languageCounts, publisherCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -31,6 +31,13 @@ describe('books', () => {
     expect(filterBooks(list, 'toread', 'Narrativa').map((x) => x.isbn)).toEqual(['2']);
     expect(genreCounts(list, 'toread', '')).toEqual([['Narrativa', 1], ['Saggio', 1]]);
     expect(genreCounts(list, 'read', 'Saggio')).toEqual([['Narrativa', 1], ['Saggio', 0]]);
+  });
+  it('conta lingue ed editori senza distinguere maiuscole, spazi o accenti e ignora i vuoti', () => {
+    const list = [b({ isbn: '1', language: 'Italiano', publisher: 'Einaudi', read: true }), b({ isbn: '2', language: ' italiano ', publisher: 'einaudi' }), b({ isbn: '3', language: 'English', publisher: 'Pen\u00e9' }), b({ isbn: '4', language: '  ', publisher: 'Pene' }), b({ isbn: '5' })];
+    expect(languageCounts(list, 'all', '')).toEqual([['Italiano', 2], ['English', 1]]);
+    expect(languageCounts(list, 'read', 'English')).toEqual([['Italiano', 1], ['English', 0]]);
+    expect(publisherCounts(list, 'all', '')).toEqual([['Einaudi', 2], ['Pen\u00e9', 2]]);
+    expect(publisherCounts([b({})], 'all', '')).toEqual([]);
   });
   it('conta le collane sullo stato attivo e ignora i libri senza collana', () => {
     const list = [b({ isbn: '1', series: 'Dune', read: true }), b({ isbn: '2', series: 'Dune' }), b({ isbn: '3', series: ' Narnia ' }), b({ isbn: '4' })];
@@ -104,6 +111,24 @@ describe('libraryStats', () => {
   });
 });
 
+describe('lingue ed editori', () => {
+  const now = new Date(2026, 9, 29);
+  it('nomi normalizzati, vuoti esclusi, al massimo 5 editori', () => {
+    const l = [
+      b({ language: 'Italiano', publisher: 'Einaudi' }), b({ language: ' italiano ', publisher: 'einaudi  ' }),
+      b({ language: 'English', publisher: '' }), b({ language: '  ' }), b({}),
+      ...['A', 'B', 'C', 'D', 'E'].map((p) => b({ publisher: p })),
+    ];
+    const s = libraryStats(l, now);
+    expect(s.languages).toEqual([['Italiano', 2], ['English', 1]]);
+    expect(s.publishers).toHaveLength(5);
+    expect(s.publishers[0]).toEqual(['Einaudi', 2]);
+  });
+  it('senza dati le liste sono vuote', () => {
+    expect(libraryStats([b({})], now)).toMatchObject({ languages: [], publishers: [] });
+  });
+});
+
 describe('amazonSearchUrl', () => {
   it('con ISBN-13 cerca per ISBN', () => {
     expect(amazonSearchUrl({ isbn: '9780804429573', title: 'Dune', authors: ['F'] })).toBe('https://www.amazon.it/s?k=9780804429573');
@@ -134,6 +159,25 @@ describe('groupStarts', () => {
   it('per recenti raggruppa per mese', () => {
     const list = sortBooks([b('1', 'A', ['X'], '2026-03-05'), b('2', 'B', ['X'], '2026-03-01'), b('3', 'C', ['X'], '2026-01-09')], 'recent');
     expect(groupStarts(list, 'recent').map((g) => g.isbn)).toEqual(['1', '3']);
+  });
+});
+
+describe('ordini per lettura e anno', () => {
+  const mk = (isbn: string, o: Partial<Book>): Book => ({ isbn, title: isbn, authors: [], ...o });
+  const l = [mk('n', {}), mk('a', { readAt: '2026-01-10', year: 1999 }), mk('c', { readAt: '2026-05-02', year: '2020' }), mk('x', { readAt: 'ieri', year: 'boh' })];
+  it('read: data decrescente, senza data in fondo', () => {
+    expect(sortBooks(l, 'read').map((x) => x.isbn)).toEqual(['c', 'a', 'n', 'x']);
+  });
+  it('year: più recente prima, non numerico o mancante in fondo', () => {
+    expect(sortBooks(l, 'year').map((x) => x.isbn)).toEqual(['c', 'a', 'n', 'x']);
+  });
+  it('etichette del rail', () => {
+    expect(groupLabel(l[1], 'year')).toBe('1999');
+    expect(groupLabel(l[0], 'year')).toBe('#');
+    expect(groupLabel(l[3], 'year')).toBe('#');
+    expect(groupLabel(l[1], 'read')).toBe(new Date(2026, 0, 1).toLocaleDateString('it', { month: 'short', year: 'numeric' }));
+    expect(groupLabel(l[0], 'read')).toBe('#');
+    expect(groupLabel(l[3], 'read')).toBe('#');
   });
 });
 
@@ -184,5 +228,19 @@ describe('topAuthors', () => {
     expect(seriesSummary([a, b, c, d], b)).toEqual({ name: 'narnia', total: 2, read: 1 });
     expect(seriesSummary([a, b, c, d], c)).toBeNull();
     expect(seriesSummary([a, b, c, d], d)).toBeNull();
+  });
+});
+
+describe('isIncomplete', () => {
+  it('un libro è da completare se manca copertina, autori, editore o anno', () => {
+    const full = { cover: 'x.jpg', authors: ['A'], publisher: 'E', year: '2001' };
+    expect(isIncomplete(b(full))).toBe(false);
+    expect(isIncomplete(b({ ...full, year: 1999 }))).toBe(false);
+    expect(isIncomplete(b({ ...full, cover: null }))).toBe(true);
+    expect(isIncomplete(b({ ...full, authors: [] }))).toBe(true);
+    expect(isIncomplete(b({ ...full, authors: [' '] }))).toBe(true);
+    expect(isIncomplete(b({ ...full, publisher: ' ' }))).toBe(true);
+    expect(isIncomplete(b({ ...full, year: '' }))).toBe(true);
+    expect(isIncomplete(b({ ...full, publisher: undefined }))).toBe(true);
   });
 });

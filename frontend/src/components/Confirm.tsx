@@ -9,9 +9,9 @@ export function Confirm({ open, onOpenChange, title, children, action, onConfirm
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-40 bg-ink/50" />
+        <AlertDialog.Overlay className="fixed inset-0 z-40 bg-scrim/50" />
         <AlertDialog.Content className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-sm -translate-y-1/2 rounded-2xl bg-paper p-5 shadow-xl">
-          <AlertDialog.Title className="mb-2 text-lg font-bold text-plum">{title}</AlertDialog.Title>
+          <AlertDialog.Title className="mb-2 text-lg font-bold text-title">{title}</AlertDialog.Title>
           <AlertDialog.Description className="mb-4 text-muted [overflow-wrap:anywhere]">{children}</AlertDialog.Description>
           <div className="flex flex-col gap-2">
             <AlertDialog.Action asChild><Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>{action}</Button></AlertDialog.Action>
