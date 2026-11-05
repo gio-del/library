@@ -398,6 +398,26 @@ describe('app', () => {
     expect(screen.queryByRole('heading', { name: 'Autori' })).toBeNull();
   });
 
+  it('Statistiche: lingue ed editori, nascosti senza dati', async () => {
+    server({ 'GET /api/books': [
+      { ...BOOKS[0], language: 'Italiano', publisher: 'Einaudi' },
+      { ...BOOKS[1], language: 'italiano', publisher: ' EINAUDI' },
+    ] });
+    open('/statistiche');
+    expect(await screen.findByRole('heading', { name: 'Lingue' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Italiano: 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Editori più presenti' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Einaudi: 2' })).toBeInTheDocument();
+  });
+
+  it('Statistiche: senza lingua né editore i blocchi non compaiono', async () => {
+    server({ 'GET /api/books': [{ ...BOOKS[0], language: '', publisher: '' }] });
+    open('/statistiche');
+    await screen.findByRole('progressbar', { name: 'Libri letti' });
+    expect(screen.queryByRole('heading', { name: 'Lingue' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Editori più presenti' })).toBeNull();
+  });
+
   it('Statistiche con libreria vuota mostra un messaggio', async () => {
     server({ 'GET /api/books': [] });
     open('/statistiche');

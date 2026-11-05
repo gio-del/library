@@ -46,6 +46,18 @@ export function Stats() {
             <h2 id="st-gen" className={h}>Generi più frequenti</h2>
             <ul className="space-y-2">{s.genres.map(([g, n]) => <Bar key={g} label={g} count={n} max={s.genres[0][1]} total={s.total} />)}</ul>
           </section>
+          {s.languages.length > 0 && (
+            <section aria-labelledby="st-lin">
+              <h2 id="st-lin" className={h}>Lingue</h2>
+              <ul className="space-y-2">{s.languages.map(([n, c]) => <Bar key={n} label={n} count={c} max={s.languages[0][1]} />)}</ul>
+            </section>
+          )}
+          {s.publishers.length > 0 && (
+            <section aria-labelledby="st-edi">
+              <h2 id="st-edi" className={h}>Editori più presenti</h2>
+              <ul className="space-y-2">{s.publishers.map(([n, c]) => <Bar key={n} label={n} count={c} max={s.publishers[0][1]} />)}</ul>
+            </section>
+          )}
           {authors.length > 0 && (
             <section aria-labelledby="st-aut">
               <h2 id="st-aut" className={h}>Autori</h2>
