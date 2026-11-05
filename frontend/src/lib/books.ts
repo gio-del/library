@@ -160,6 +160,8 @@ export interface LibraryStats {
   read: number;
   toRead: number;
   genres: [string, number][];
+  languages: [string, number][];
+  publishers: [string, number][];
   months: { key: string; label: string; count: number }[];
   readMonths: { key: string; label: string; count: number }[];
   rated: number;
@@ -168,6 +170,21 @@ export interface LibraryStats {
 
 export const STATS_GENRES = 8;
 export const STATS_MONTHS = 6;
+export const STATS_PUBLISHERS = 5;
+
+// Conta i valori testuali con nome normalizzato (maiuscole e spazi ignorati); vuoti esclusi; si mostra la prima forma incontrata.
+export function countField(books: Book[], field: 'language' | 'publisher'): [string, number][] {
+  const m = new Map<string, [string, number]>();
+  for (const b of books) {
+    const v = b[field];
+    const label = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '';
+    if (!label) continue;
+    const k = label.toLowerCase();
+    const e = m.get(k);
+    if (e) e[1]++; else m.set(k, [label, 1]);
+  }
+  return [...m.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
+}
 
 // Stessi conteggi della Libreria (matchRead, genreCounts); i mesi sono gli ultimi 6 fino a `now`, in ora locale.
 export function libraryStats(books: Book[], now: Date): LibraryStats {
@@ -195,6 +212,8 @@ export function libraryStats(books: Book[], now: Date): LibraryStats {
     read: books.filter((b) => matchRead(b, 'read')).length,
     toRead: books.filter((b) => matchRead(b, 'toread')).length,
     genres: genreCounts(books, 'all', '').slice(0, STATS_GENRES),
+    languages: countField(books, 'language'),
+    publishers: countField(books, 'publisher').slice(0, STATS_PUBLISHERS),
     months,
     readMonths,
     rated: ratings.length,

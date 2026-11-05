@@ -104,6 +104,24 @@ describe('libraryStats', () => {
   });
 });
 
+describe('lingue ed editori', () => {
+  const now = new Date(2026, 9, 29);
+  it('nomi normalizzati, vuoti esclusi, al massimo 5 editori', () => {
+    const l = [
+      b({ language: 'Italiano', publisher: 'Einaudi' }), b({ language: ' italiano ', publisher: 'einaudi  ' }),
+      b({ language: 'English', publisher: '' }), b({ language: '  ' }), b({}),
+      ...['A', 'B', 'C', 'D', 'E'].map((p) => b({ publisher: p })),
+    ];
+    const s = libraryStats(l, now);
+    expect(s.languages).toEqual([['Italiano', 2], ['English', 1]]);
+    expect(s.publishers).toHaveLength(5);
+    expect(s.publishers[0]).toEqual(['Einaudi', 2]);
+  });
+  it('senza dati le liste sono vuote', () => {
+    expect(libraryStats([b({})], now)).toMatchObject({ languages: [], publishers: [] });
+  });
+});
+
 describe('amazonSearchUrl', () => {
   it('con ISBN-13 cerca per ISBN', () => {
     expect(amazonSearchUrl({ isbn: '9780804429573', title: 'Dune', authors: ['F'] })).toBe('https://www.amazon.it/s?k=9780804429573');
