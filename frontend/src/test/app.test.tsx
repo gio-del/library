@@ -163,6 +163,35 @@ describe('app', () => {
     expect(screen.getByRole('searchbox')).toHaveValue('');
   });
 
+  it('il filtro «Da completare» mostra i libri con dati mancanti, si combina con gli altri e si toglie dal chip', async () => {
+    const full = { cover: 'c.jpg', publisher: 'Einaudi', year: '2001' };
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Completo', authors: ['Rossi'], ...full },
+      { isbn: '9780306406164', title: 'SenzaAnno', authors: ['Rossi'], ...full, year: '' },
+      { isbn: '9780306406171', title: 'SenzaCopertina', authors: ['Bianchi'], ...full, cover: null, read: true },
+    ] });
+    open('/libreria');
+    await screen.findByText('Completo');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const group = within(await screen.findByRole('group', { name: 'Dati mancanti' }));
+    expect(group.getByRole('button', { name: /^Da completare/ })).toHaveTextContent('2');
+    await userEvent.click(group.getByRole('button', { name: /^Da completare/ }));
+    expect(screen.queryByText('Completo')).not.toBeInTheDocument();
+    expect(screen.getByText('SenzaAnno')).toBeInTheDocument();
+    expect(screen.getByText('SenzaCopertina')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-dot')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
+    expect(screen.queryByText('SenzaAnno')).not.toBeInTheDocument();
+    expect(screen.getByText('SenzaCopertina')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Tutti/ }));
+    await userEvent.type(screen.getByRole('searchbox'), 'senzaanno');
+    expect(screen.queryByText('SenzaCopertina')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Togli il filtro Da completare' }));
+    expect(screen.getByText('Completo')).toBeInTheDocument();
+    expect(screen.queryByTestId('filter-dot')).not.toBeInTheDocument();
+  });
+
   it('il foglio Filtri sceglie il genere, mostra il puntino e si azzera', async () => {
     server({ 'GET /api/books': [...BOOKS, { isbn: '9780306406171', title: 'Sapiens', authors: ['Harari'], genres: ['Saggio'], cover: 'c.jpg' }] });
     open('/libreria');
