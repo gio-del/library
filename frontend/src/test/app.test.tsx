@@ -363,6 +363,48 @@ describe('app', () => {
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
   });
 
+  it('il foglio Filtri filtra per lingua ed editore, con chip e azzeramento', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Austen'], cover: 'a.jpg', added: '2026-03-01', language: 'en', publisher: 'Penguin' },
+      { isbn: '9780306406164', title: 'Il leone', authors: ['Lewis'], cover: 'b.jpg', added: '2026-02-01', language: 'it', publisher: 'Mondadori' },
+      { isbn: '9780306406171', title: 'Caspian', authors: ['Lewis'], cover: 'c.jpg', added: '2026-01-01', language: ' IT ', publisher: 'mondadori' },
+    ] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const titles = () => screen.getAllByRole('link', { name: /Mansfield|leone|Caspian/ }).map((a) => a.textContent);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const lang = within(await screen.findByRole('group', { name: 'Lingua' }));
+    expect(lang.getByRole('button', { name: /^it/ })).toHaveTextContent('2');
+    await userEvent.click(lang.getByRole('button', { name: /^it/ }));
+    expect(titles()).toHaveLength(2);
+    expect(screen.queryByText('Mansfield Park')).not.toBeInTheDocument();
+    const chip = screen.getByRole('button', { name: 'Togli il filtro Lingua it' });
+    await userEvent.click(chip);
+    expect(titles()).toHaveLength(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Editore' })).getByRole('button', { name: /^Penguin/ }));
+    expect(titles()).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Togli il filtro Editore Penguin' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Azzera tutto' }));
+    expect(titles()).toHaveLength(3);
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument();
+  });
+
+  it('con un solo valore di lingua o editore le sezioni non compaiono', async () => {
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Austen'], cover: 'a.jpg', language: 'it', publisher: 'Penguin' },
+      { isbn: '9780306406164', title: 'Il leone', authors: ['Lewis'], cover: 'b.jpg', language: 'IT', publisher: 'penguin' },
+    ] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await screen.findByRole('group', { name: 'Genere' });
+    expect(screen.queryByRole('group', { name: 'Lingua' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Editore' })).not.toBeInTheDocument();
+  });
+
   it('senza libri con collana il foglio Filtri non mostra la sezione Collana', async () => {
     server();
     open('/libreria');

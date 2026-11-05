@@ -1,4 +1,4 @@
-import { groupLabel, amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
+import { groupLabel, amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, languageCounts, publisherCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -31,6 +31,13 @@ describe('books', () => {
     expect(filterBooks(list, 'toread', 'Narrativa').map((x) => x.isbn)).toEqual(['2']);
     expect(genreCounts(list, 'toread', '')).toEqual([['Narrativa', 1], ['Saggio', 1]]);
     expect(genreCounts(list, 'read', 'Saggio')).toEqual([['Narrativa', 1], ['Saggio', 0]]);
+  });
+  it('conta lingue ed editori senza distinguere maiuscole, spazi o accenti e ignora i vuoti', () => {
+    const list = [b({ isbn: '1', language: 'Italiano', publisher: 'Einaudi', read: true }), b({ isbn: '2', language: ' italiano ', publisher: 'einaudi' }), b({ isbn: '3', language: 'English', publisher: 'Pen\u00e9' }), b({ isbn: '4', language: '  ', publisher: 'Pene' }), b({ isbn: '5' })];
+    expect(languageCounts(list, 'all', '')).toEqual([['Italiano', 2], ['English', 1]]);
+    expect(languageCounts(list, 'read', 'English')).toEqual([['Italiano', 1], ['English', 0]]);
+    expect(publisherCounts(list, 'all', '')).toEqual([['Einaudi', 2], ['Pen\u00e9', 2]]);
+    expect(publisherCounts([b({})], 'all', '')).toEqual([]);
   });
   it('conta le collane sullo stato attivo e ignora i libri senza collana', () => {
     const list = [b({ isbn: '1', series: 'Dune', read: true }), b({ isbn: '2', series: 'Dune' }), b({ isbn: '3', series: ' Narnia ' }), b({ isbn: '4' })];

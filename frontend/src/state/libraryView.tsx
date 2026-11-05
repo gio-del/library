@@ -5,7 +5,7 @@ import type { ReadFilter, SortOrder } from '../lib/books';
 // (si perdono chiudendo o ricaricando l'app) e valgono per la voce di cronologia `key` in cui sono stati salvati.
 export type LibraryView = {
   key: string;
-  state: ReadFilter; genre: string; series: string; author: string;
+  state: ReadFilter; genre: string; series: string; language: string; publisher: string; author: string;
   incomplete: boolean; minRating: number; order: SortOrder; query: string;
   scrollY: number;
 };
