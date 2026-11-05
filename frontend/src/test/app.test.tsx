@@ -238,7 +238,7 @@ describe('app', () => {
     expect(titles()[0]).toContain('Mansfield');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     let group = await screen.findByRole('group', { name: 'Ordina per' });
-    expect(within(group).getAllByRole('button')).toHaveLength(4);
+    expect(within(group).getAllByRole('button')).toHaveLength(6);
     expect(within(group).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Azzera tutto' })).toBeDisabled();
     await userEvent.click(within(group).getByRole('button', { name: 'Aggiunti di recente' }));
@@ -257,6 +257,30 @@ describe('app', () => {
     expect(titles()[0]).toContain('Mansfield');
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     expect(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name: 'Autore A→Z' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('il foglio Filtri ordina per data di lettura e per anno, con i libri senza valore in fondo', async () => {
+    window.innerWidth = 390;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Alfa', authors: ['A'], cover: 'a.jpg', added: '2026-01-01', read: true, readAt: '2026-01-10', year: 1999 },
+      { isbn: '9780306406164', title: 'Beta', authors: ['B'], cover: 'b.jpg', added: '2026-02-01' , year: 'boh' },
+      { isbn: '9780306406171', title: 'Gamma', authors: ['C'], cover: 'c.jpg', added: '2026-03-01', read: true, readAt: '2026-05-02', year: 2020 },
+    ] });
+    open('/libreria');
+    await screen.findByText('Alfa');
+    const titles = () => screen.getAllByRole('link', { name: /Alfa|Beta|Gamma/ }).map((a) => a.textContent);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    let group = await screen.findByRole('group', { name: 'Ordina per' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Letti di recente' }));
+    expect(within(group).getByRole('button', { name: 'Letti di recente' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(titles().map((t) => t!.match(/Alfa|Beta|Gamma/)![0])).toEqual(['Gamma', 'Alfa', 'Beta']);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    group = await screen.findByRole('group', { name: 'Ordina per' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Anno di pubblicazione' }));
+    expect(within(group).getByRole('button', { name: 'Anno di pubblicazione' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Azzera tutto' }));
+    expect(titles()[0]).toContain('Alfa');
   });
 
   it('il foglio Filtri ordina per voto e filtra per voto minimo con chip', async () => {

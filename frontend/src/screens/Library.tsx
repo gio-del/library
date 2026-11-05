@@ -9,7 +9,7 @@ import { Sheet } from '../components/Sheet';
 import { LetterRail, type RailGroup } from '../components/LetterRail';
 
 const STATES: [ReadFilter, string][] = [['all', 'Tutti'], ['toread', 'Da leggere'], ['read', 'Letti']];
-const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
+const ORDERS: [SortOrder, string][] = [['recent', 'Aggiunti di recente'], ['read', 'Letti di recente'], ['year', 'Anno di pubblicazione'], ['title', 'Titolo A→Z'], ['author', 'Autore A→Z'], ['rating', 'Voto']];
 const DEFAULT_ORDER: SortOrder = 'author';
 
 const MIN_RAIL = 12;
