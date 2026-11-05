@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import { AuthProvider } from '../state/auth';
 import type { Book } from '../lib/types';
-import { todayIso } from '../lib/books';
+import { todayIso, wishlistText } from '../lib/books';
 import { pacing } from '../hooks/useCompleteMissing';
 
 const BOOKS: Book[] = [
@@ -890,6 +890,58 @@ describe('app', () => {
       expect(l).toHaveAttribute('rel', 'noopener noreferrer');
       expect(l.className).toContain('min-h-11');
     }
+  });
+
+  it('wishlistText: una riga per desiderio, ISBN se manca il titolo', () => {
+    expect(wishlistText([
+      { isbn: '9780804429573', title: 'Dune', authors: ['Frank Herbert', 'X'] },
+      { isbn: 'm42', title: 'Solo titolo', authors: [] },
+      { isbn: '9788817152754', title: '', authors: ['Nessuno'] },
+    ])).toBe('Dune — Frank Herbert, X (9780804429573)\nSolo titolo (m42)\n9788817152754');
+    expect(wishlistText([])).toBe('');
+  });
+
+  describe('condividi i desideri', () => {
+    const wish = [{ isbn: '9780804429573', title: 'Dune', authors: ['Frank Herbert'], cover: null }];
+    const stub = (list: unknown[]) => vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const ok = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      if (url === '/api/auth/status') return ok({ authenticated: true });
+      if (url === '/api/books') return ok(BOOKS);
+      if (url === '/api/wishlist') return ok(list);
+      return ok({ error: 'Non trovato' }, 404);
+    }));
+    afterEach(() => {
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    });
+
+    it('con navigator.share apre il foglio di condivisione', async () => {
+      window.innerWidth = 360;
+      const share = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+      stub(wish);
+      open('/desideri');
+      await userEvent.click(await screen.findByRole('button', { name: 'Condividi la lista' }));
+      expect(share).toHaveBeenCalledWith({ title: 'Lista dei desideri', text: 'Dune — Frank Herbert (9780804429573)' });
+    });
+
+    it('senza navigator.share copia negli appunti e avvisa', async () => {
+      window.innerWidth = 360;
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      stub(wish);
+      open('/desideri');
+      await userEvent.click(await screen.findByRole('button', { name: 'Condividi la lista' }));
+      expect(writeText).toHaveBeenCalledWith('Dune — Frank Herbert (9780804429573)');
+      expect(await screen.findByText('Copiato')).toBeInTheDocument();
+    });
+
+    it('con la lista vuota il pulsante è disattivato', async () => {
+      stub([]);
+      open('/desideri');
+      expect(await screen.findByRole('button', { name: 'Condividi la lista' })).toBeDisabled();
+    });
   });
 
   it('«Cerca di nuovo i dati» su un ISBN non trovato lascia un messaggio che resta', async () => {
