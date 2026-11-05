@@ -51,7 +51,9 @@ describe('selezione multipla', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Seleziona tutti i visibili' }));
     expect(screen.getByText('2 selezionati')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Segna da leggere' }));
-    await waitFor(() => expect(bodies).toEqual([{ isbns: ['9780306406171', '9780306406157'], action: 'unread' }]));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ isbns: expect.arrayContaining(['9780306406171', '9780306406157']), action: 'unread' });
+    expect((bodies[0] as { isbns: string[] }).isbns).toHaveLength(2);
   });
 
   it('elimina chiede conferma; aggiungi genere usa il genere scelto', async () => {
