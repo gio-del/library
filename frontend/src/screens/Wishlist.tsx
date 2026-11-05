@@ -1,6 +1,6 @@
-import { ExternalLink, Trash2 } from 'lucide-react';
+import { ExternalLink, Share2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { amazonSearchUrl } from '../lib/books';
+import { amazonSearchUrl, wishlistText } from '../lib/books';
 import { api } from '../lib/api';
 import type { Book, WishItem } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -44,8 +44,22 @@ export function Wishlist() {
     setBusy('');
   }
 
+  async function share() {
+    if (!items || items.length === 0) return;
+    const text = wishlistText(items);
+    if (typeof navigator.share === 'function') {
+      try { await navigator.share({ title: 'Lista dei desideri', text }); } catch { /* annullata */ }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Copiato');
+    } catch { toast('Non riesco a copiare la lista', true); }
+  }
+
   return (
     <SubPage title="Desideri" fallback="/libreria">
+      {!err && items !== null && <Button className="mb-3" disabled={items.length === 0} onClick={() => void share()}><Share2 aria-hidden className="size-5" />Condividi la lista</Button>}
       {err ? <Msg text={err} error /> : items === null ? <Msg text="Carico…" /> : items.length === 0 ? <Msg text="Nessun desiderio: dalla schermata Scansiona puoi segnare i libri da comprare." /> : (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {items.map((w) => (

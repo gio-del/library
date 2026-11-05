@@ -285,3 +285,13 @@ export function groupStarts(sorted: Book[], order: SortOrder): { label: string; 
   }
   return out;
 }
+
+/** Testo da condividere: un desiderio per riga, «Titolo — Autori (ISBN)»; senza titolo solo l'ISBN. */
+export function wishlistText(items: { isbn: string; title?: string; authors?: string[] }[]): string {
+  return items.map((w) => {
+    const title = typeof w.title === 'string' ? w.title.trim() : '';
+    if (!title) return w.isbn;
+    const authors = (Array.isArray(w.authors) ? w.authors : []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim()).join(', ');
+    return `${title}${authors ? ` — ${authors}` : ''} (${w.isbn})`;
+  }).join('\n');
+}
