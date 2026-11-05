@@ -1,4 +1,4 @@
-import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
+import { amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -184,5 +184,19 @@ describe('topAuthors', () => {
     expect(seriesSummary([a, b, c, d], b)).toEqual({ name: 'narnia', total: 2, read: 1 });
     expect(seriesSummary([a, b, c, d], c)).toBeNull();
     expect(seriesSummary([a, b, c, d], d)).toBeNull();
+  });
+});
+
+describe('isIncomplete', () => {
+  it('un libro è da completare se manca copertina, autori, editore o anno', () => {
+    const full = { cover: 'x.jpg', authors: ['A'], publisher: 'E', year: '2001' };
+    expect(isIncomplete(b(full))).toBe(false);
+    expect(isIncomplete(b({ ...full, year: 1999 }))).toBe(false);
+    expect(isIncomplete(b({ ...full, cover: null }))).toBe(true);
+    expect(isIncomplete(b({ ...full, authors: [] }))).toBe(true);
+    expect(isIncomplete(b({ ...full, authors: [' '] }))).toBe(true);
+    expect(isIncomplete(b({ ...full, publisher: ' ' }))).toBe(true);
+    expect(isIncomplete(b({ ...full, year: '' }))).toBe(true);
+    expect(isIncomplete(b({ ...full, publisher: undefined }))).toBe(true);
   });
 });

@@ -2,6 +2,9 @@ import type { Book } from './types';
 
 export const hasIsbn = (b: Book) => /^\d{13}$/.test(b.isbn);
 export const needsRetry = (b: Book) => hasIsbn(b) && (b.lookup === 'failed' || !b.cover);
+/** Manca almeno uno tra copertina, autori, editore e anno. */
+export const isIncomplete = (b: Book) =>
+  !b.cover || authorsOf(b).length === 0 || !(typeof b.publisher === 'string' && b.publisher.trim()) || !(typeof b.year === 'number' ? Number.isFinite(b.year) && b.year !== 0 : typeof b.year === 'string' && b.year.trim());
 // Ricerca su Amazon: per ISBN-13, altrimenti (codice manuale) per titolo e autori. Solo testo pubblico del libro.
 export function amazonSearchUrl(item: { isbn: string; title?: string; authors?: string[] }): string {
   const q = /^\d{13}$/.test(item.isbn) ? item.isbn : [item.title, ...(item.authors || [])].filter(Boolean).join(' ') || item.isbn;
