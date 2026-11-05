@@ -58,6 +58,26 @@ export function seriesCounts(books: Book[], f: ReadFilter, selected: string): [s
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
 }
 
+export const languageOf = (b: Book) => (typeof b.language === 'string' ? b.language.trim().replace(/\s+/g, ' ') : '');
+export const publisherOf = (b: Book) => (typeof b.publisher === 'string' ? b.publisher.trim().replace(/\s+/g, ' ') : '');
+
+function valueCounts(books: Book[], f: ReadFilter, selected: string, of: (b: Book) => string): [string, number][] {
+  const counts = new Map<string, [string, number]>();
+  for (const b of books.filter((x) => matchRead(x, f))) {
+    const v = of(b);
+    if (!v) continue;
+    const e = counts.get(norm(v)) || [v, 0];
+    e[1]++;
+    counts.set(norm(v), e);
+  }
+  if (selected && !counts.has(norm(selected))) counts.set(norm(selected), [selected, 0]);
+  return [...counts.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'));
+}
+
+/** Lingue dei libri con i conteggi (senza distinguere maiuscole, spazi o accenti); i valori vuoti si ignorano. */
+export const languageCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, languageOf);
+export const publisherCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, publisherOf);
+
 export const authorsOf = (b: Book): string[] => (Array.isArray(b.authors) ? b.authors : []).filter((a): a is string => typeof a === 'string' && !!a.trim()).map((a) => a.trim());
 export const hasAuthor = (b: Book, author: string) => authorsOf(b).some((a) => norm(a) === norm(author));
 

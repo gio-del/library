@@ -2,7 +2,7 @@ import { Check, CheckSquare, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ApiError } from '../lib/api';
-import { authorCounts, bookGenres, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
+import { authorCounts, bookGenres, languageCounts, languageOf, publisherCounts, publisherOf, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks, type BulkAction } from '../state/books';
 import { useToast } from '../components/Toast';
@@ -29,6 +29,8 @@ export function Library() {
   const [state, setState] = useState<ReadFilter>(saved?.state ?? 'all');
   const [genre, setGenre] = useState(saved?.genre ?? '');
   const [series, setSeries] = useState(saved?.series ?? '');
+  const [language, setLanguage] = useState(saved?.language ?? '');
+  const [publisher, setPublisher] = useState(saved?.publisher ?? '');
   const [author, setAuthor] = useState(saved?.author ?? '');
   const [incomplete, setIncomplete] = useState(saved?.incomplete ?? false);
   const [minRating, setMinRating] = useState(saved?.minRating ?? 0);
@@ -46,15 +48,15 @@ export function Library() {
   const longPressed = useRef(false);
   const first = useRef(true);
   const pendingScroll = useRef<number | null>(saved ? saved.scrollY : null);
-  const view = useRef<Omit<LibraryView, 'scrollY'>>({ key, state, genre, series, author, incomplete, minRating, order, query });
-  view.current = { key, state, genre, series, author, incomplete, minRating, order, query };
+  const view = useRef<Omit<LibraryView, 'scrollY'>>({ key, state, genre, series, language, publisher, author, incomplete, minRating, order, query });
+  view.current = { key, state, genre, series, language, publisher, author, incomplete, minRating, order, query };
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca, filtri e posizione.
   // Dalla scheda del libro si arriva con l'autore scelto nello stato di navigazione.
   useEffect(() => {
     if (first.current) { first.current = false; if (saved) return; }
     pendingScroll.current = null;
-    setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
+    setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setLanguage(''); setPublisher(''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   // All'uscita dalla Libreria si salvano i filtri e la posizione di scorrimento.
@@ -65,7 +67,7 @@ export function Library() {
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
-  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, author, incomplete, minRating, order]);
+  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!language || norm(languageOf(b)) === norm(language)) && (!publisher || norm(publisherOf(b)) === norm(publisher)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, language, publisher, author, incomplete, minRating, order]);
   useEffect(() => {
     if (pendingScroll.current === null || !loaded) return;
     window.scrollTo({ top: pendingScroll.current });
@@ -106,10 +108,12 @@ export function Library() {
   };
   const genres = genreCounts(searched, state, genre);
   const seriesList = seriesCounts(searched, state, series);
+  const languageList = languageCounts(searched, state, language);
+  const publisherList = publisherCounts(searched, state, publisher);
   const authorList = authorCounts(searched, state, author);
   const incompleteCount = searched.filter((b) => matchRead(b, state) && isIncomplete(b)).length;
   const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
-  const active = state !== 'all' || genre !== '' || series !== '' || author !== '' || incomplete || minRating > 0 || q !== '' || order !== DEFAULT_ORDER;
+  const active = state !== 'all' || genre !== '' || series !== '' || language !== '' || publisher !== '' || author !== '' || incomplete || minRating > 0 || q !== '' || order !== DEFAULT_ORDER;
 
   let status = '';
   if (err) status = err;
@@ -130,7 +134,7 @@ export function Library() {
           </button>
           <button type="button" aria-label="Filtri" onClick={() => setOpen(true)} className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-plum-2 text-white">
             <SlidersHorizontal aria-hidden />
-            {(genre || series || author || incomplete || minRating > 0) && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
+            {(genre || series || language || publisher || author || incomplete || minRating > 0) && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
           </button>
         </div>
         <div role="group" aria-label="Stato" className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-lilac-soft p-1">
@@ -138,11 +142,13 @@ export function Library() {
             <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-title')}>{label} ({count(f)})</button>
           ))}
         </div>
-        {(genre || series || author || incomplete || minRating > 0 || q) && (
+        {(genre || series || language || publisher || author || incomplete || minRating > 0 || q) && (
           <div data-testid="active-filters" className="mt-2 flex flex-wrap gap-2">
             {q && <button type="button" onClick={() => setQuery('')} aria-label={`Togli il filtro Testo ${query.trim()}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Testo {query.trim()}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {series && <button type="button" onClick={() => setSeries('')} aria-label={`Togli il filtro Collana ${series}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Collana {series}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {language && <button type="button" onClick={() => setLanguage('')} aria-label={`Togli il filtro Lingua ${language}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Lingua {language}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {publisher && <button type="button" onClick={() => setPublisher('')} aria-label={`Togli il filtro Editore ${publisher}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Editore {publisher}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {author && <button type="button" onClick={() => setAuthor('')} aria-label={`Togli il filtro Autore ${author}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Autore {author}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {incomplete && <button type="button" onClick={() => setIncomplete(false)} aria-label="Togli il filtro Da completare" className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0">Da completare</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {minRating > 0 && <button type="button" onClick={() => setMinRating(0)} aria-label={`Togli il filtro Voto minimo ${minRating}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0">Voto minimo {minRating}</span><X aria-hidden className="size-4 shrink-0" /></button>}
@@ -238,6 +244,24 @@ export function Library() {
             </div>
           </>
         )}
+        {(languageList.length >= 2 || language !== '') && (
+          <>
+            <p className="mb-2 mt-4 text-sm font-medium text-muted">Lingua</p>
+            <div role="group" aria-label="Lingua" className="flex flex-col gap-2">
+              <GenreRow label="Tutte le lingue" count={count(state)} on={language === ''} onPick={() => { setLanguage(''); setOpen(false); }} />
+              {languageList.map(([s, c]) => <GenreRow key={s} label={s} count={c} on={norm(language) === norm(s)} onPick={() => { setLanguage(s); setOpen(false); }} />)}
+            </div>
+          </>
+        )}
+        {(publisherList.length >= 2 || publisher !== '') && (
+          <>
+            <p className="mb-2 mt-4 text-sm font-medium text-muted">Editore</p>
+            <div role="group" aria-label="Editore" className="flex flex-col gap-2">
+              <GenreRow label="Tutti gli editori" count={count(state)} on={publisher === ''} onPick={() => { setPublisher(''); setOpen(false); }} />
+              {publisherList.map(([s, c]) => <GenreRow key={s} label={s} count={c} on={norm(publisher) === norm(s)} onPick={() => { setPublisher(s); setOpen(false); }} />)}
+            </div>
+          </>
+        )}
         {authorList.length > 0 && (
           <>
             <p className="mb-2 mt-4 text-sm font-medium text-muted">Autore</p>
@@ -247,7 +271,7 @@ export function Library() {
             </div>
           </>
         )}
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setAuthor(''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-title disabled:opacity-50">Azzera tutto</button>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setLanguage(''); setPublisher(''); setAuthor(''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-title disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );
