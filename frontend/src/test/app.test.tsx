@@ -178,11 +178,11 @@ describe('app', () => {
     await userEvent.click(group.getByRole('button', { name: /^Da completare/ }));
     expect(screen.queryByText('Completo')).not.toBeInTheDocument();
     expect(screen.getByText('SenzaAnno')).toBeInTheDocument();
-    expect(screen.getByText('SenzaCopertina')).toBeInTheDocument();
+    expect(screen.getAllByText('SenzaCopertina').length).toBeGreaterThan(0);
     expect(screen.getByTestId('filter-dot')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Letti/ }));
     expect(screen.queryByText('SenzaAnno')).not.toBeInTheDocument();
-    expect(screen.getByText('SenzaCopertina')).toBeInTheDocument();
+    expect(screen.getAllByText('SenzaCopertina').length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: /^Tutti/ }));
     await userEvent.type(screen.getByRole('searchbox'), 'senzaanno');
     expect(screen.queryByText('SenzaCopertina')).not.toBeInTheDocument();

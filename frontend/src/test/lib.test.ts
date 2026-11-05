@@ -185,6 +185,9 @@ describe('topAuthors', () => {
     expect(seriesSummary([a, b, c, d], c)).toBeNull();
     expect(seriesSummary([a, b, c, d], d)).toBeNull();
   });
+});
+
+describe('isIncomplete', () => {
   it('un libro è da completare se manca copertina, autori, editore o anno', () => {
     const full = { cover: 'x.jpg', authors: ['A'], publisher: 'E', year: '2001' };
     expect(isIncomplete(b(full))).toBe(false);
