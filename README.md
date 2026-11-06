@@ -1,6 +1,6 @@
 # library
 
-Scansiona il codice a barre (ISBN) dei tuoi libri col telefono e tieni una libreria virtuale. Node 22, backend senza dipendenze npm; frontend React + Vite in `frontend/` (`./ci` lo costruisce in `public/`). I dati dei libri vengono da [Open Library](https://openlibrary.org); le copertine sono scaricate dal server, così il telefono non contatta terzi.
+Scansiona il codice a barre (ISBN) dei tuoi libri col telefono e tieni una libreria virtuale. Node 22, backend senza dipendenze npm; frontend React + Vite in `frontend/` (`./ci` lo costruisce in `public/`). I dati dei libri vengono da tre fonti, interrogate dal server nell'ordine: [Open Library](https://openlibrary.org), [SBN](https://opac.sbn.it) e [Google Books](https://books.google.com) (vedi «Fonti dei dati»); le copertine sono scaricate dal server, così il telefono non contatta terzi.
 
 ## Avvio
 
@@ -19,6 +19,7 @@ Poi apri `http://127.0.0.1:8080`. Per la fotocamera il browser vuole HTTPS (mett
 | `DATA_DIR` | `./data` | `books.json`, `sessions.json` (sessioni di accesso, solo l’hash SHA-256 dei token, permessi 0600: restano valide dopo un riavvio), `covers/` e, se vuoi, `logo.png` o `logo.jpg` (il tuo logo nella schermata di accesso; senza, l’emblema dell’app) |
 | `AUTH_USER` | `library` | utente del login |
 | `AUTH_PASSWORD` / `AUTH_PASSWORD_FILE` | obbligatoria | password, o file che la contiene; senza, il server non parte |
+| `GOOGLE_BOOKS_API_KEY` | assente | chiave API di Google Books, facoltativa: senza, la quota giornaliera condivisa si esaurisce spesso e Google risponde 429 (esito `error`); con la chiave la quota sale |
 | `CLAUDE_BIN` | spenta | percorso di Claude Code (`claude`): attiva «Leggi i dati dalla foto». Senza, `POST /api/cover-read` risponde 404 e l’interfaccia non mostra il pulsante |
 | `CLAUDE_TIMEOUT_MS` | `60000` | tempo massimo di una lettura |
 
@@ -29,6 +30,18 @@ Al primo salvataggio di ogni giorno il server salva anche lo stato di prima in `
 ### Leggere i dati dalla foto della copertina
 
 Funzione facoltativa, spenta di default. Per attivarla: installa Claude Code, fai il login (`claude`, una volta) **con l’utente che fa girare il server** e imposta `CLAUDE_BIN` con il percorso dell’eseguibile. Il server lancia, senza shell, `claude -p --model haiku --strict-mcp-config --tools Read --allowedTools Read --output-format json` in una cartella temporanea propria della richiesta (cancellata sempre), senza strumenti web, una lettura alla volta (le altre ricevono 429). Titolo, autori, editore e lingua letti dalla copertina compilano solo i campi vuoti, marcati «dalla foto»; non si salva nulla finché non premi «Salva».
+
+### Fonti dei dati
+
+Il server interroga, nell'ordine, Open Library, SBN e Google Books; la prima che trova il libro vince e le altre non sono più chiamate. Se il libro è trovato senza autore, il server lo chiede alle altre fonti e usa il primo che ne ha uno; se la fonte non dà né soggetti né Dewey, il genere viene chiesto a SBN. Le copertine vengono prima da Open Library, poi (per gli ISBN che hanno la forma a 10 cifre) da Amazon (immagini pubbliche, endpoint non ufficiale), sempre scaricate dal server.
+
+«Cerca di nuovo i dati» mostra l'esito per ogni fonte interrogata:
+
+- `found`: la fonte ha trovato il libro;
+- `notfound`: la fonte ha risposto, ma non conosce l'ISBN;
+- `error`: la fonte non ha risposto (rete, timeout, limite di richieste come il 429 di Google Books). Riprova più tardi, oppure imposta `GOOGLE_BOOKS_API_KEY`.
+
+Le fonti non interrogate (perché una precedente ha già trovato il libro) non compaiono.
 
 ## API
 
