@@ -660,12 +660,12 @@ test('POST /api/books/restore: ripristina l\'ultima eliminazione con la copertin
   ]));
   assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 404);
   assert.strictEqual((await call('POST', '/api/books/restore')).status, 401);
-  await call('DELETE', `/api/books/${A}`, undefined, c);
-  assert.ok(!fs.existsSync(path.join(dataDir, 'covers', `${A}.jpg`)));
+  await call('DELETE', `/api/books/${B}`, undefined, c);
   // conflitto: stesso ISBN riaggiunto nel frattempo
-  await call('POST', '/api/books', { isbn: A }, c);
+  await call('POST', '/api/books', { isbn: B }, c);
   assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 409);
   await call('DELETE', `/api/books/${A}`, undefined, c);
+  assert.ok(!fs.existsSync(path.join(dataDir, 'covers', `${A}.jpg`)));
   await call('DELETE', `/api/books/${A}`, undefined, c); // 404, non cambia il gruppo
   const r = await call('POST', '/api/books/restore', undefined, c);
   assert.strictEqual(r.status, 200);
