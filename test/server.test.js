@@ -647,3 +647,55 @@ test('POST /api/books/bulk: segna letti, genere, elimina; input non validi', asy
   assert.deepStrictEqual(r.removed.sort(), [A, B]);
   assert.deepStrictEqual(await (await call('GET', '/api/books', undefined, c)).json(), []);
 });
+
+test('POST /api/books/restore: ripristina l\'ultima eliminazione con la copertina, scade, non sovrascrive', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  const c = await login();
+  const A = '9780306406157', B = '9780306406164';
+  fs.mkdirSync(path.join(dataDir, 'covers'));
+  fs.writeFileSync(path.join(dataDir, 'covers', `${A}.jpg`), 'jpgA');
+  fs.writeFileSync(path.join(dataDir, 'books.json'), JSON.stringify([
+    { isbn: A, title: 'A', authors: [], genres: ['x'], rating: 4, notes: 'n', cover: `${A}.jpg` },
+    { isbn: B, title: 'B', authors: [], genres: [] },
+  ]));
+  assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 404);
+  assert.strictEqual((await call('POST', '/api/books/restore')).status, 401);
+  await call('DELETE', `/api/books/${A}`, undefined, c);
+  assert.ok(!fs.existsSync(path.join(dataDir, 'covers', `${A}.jpg`)));
+  // conflitto: stesso ISBN riaggiunto nel frattempo
+  await call('POST', '/api/books', { isbn: A }, c);
+  assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 409);
+  await call('DELETE', `/api/books/${A}`, undefined, c);
+  await call('DELETE', `/api/books/${A}`, undefined, c); // 404, non cambia il gruppo
+  const r = await call('POST', '/api/books/restore', undefined, c);
+  assert.strictEqual(r.status, 200);
+  const list = await (await call('GET', '/api/books', undefined, c)).json();
+  assert.deepStrictEqual(list.find((b) => b.isbn === A).rating, 4);
+  assert.strictEqual(fs.readFileSync(path.join(dataDir, 'covers', `${A}.jpg`), 'utf8'), 'jpgA');
+  assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 404); // una volta sola
+  // gruppo multiplo; una nuova eliminazione sostituisce la precedente
+  await call('POST', '/api/books/bulk', { isbns: [A, B], action: 'delete' }, c);
+  assert.strictEqual((await (await call('POST', '/api/books/restore', undefined, c)).json()).books.length, 2);
+  await call('DELETE', `/api/books/${B}`, undefined, c);
+  await call('DELETE', `/api/books/${A}`, undefined, c);
+  await call('POST', '/api/books/restore', undefined, c);
+  const left = (await (await call('GET', '/api/books', undefined, c)).json()).map((b) => b.isbn);
+  assert.deepStrictEqual(left, [A]);
+});
+
+test('POST /api/books/restore: dopo 60 secondi non c\'è più nulla', async (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lib-srv-'));
+  const config = readConfig({ DATA_DIR: dataDir, AUTH_PASSWORD: 'segreto', PORT: '0' });
+  let clock = Date.now();
+  const server = createServer({ config, fetchFn: fakeFetch, now: () => clock });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = (method, p, body, cookie) => fetch(base + p, { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}) }, body: body && JSON.stringify(body) });
+  const c = (await call('POST', '/api/login', { password: 'segreto' })).headers.get('set-cookie').split(';')[0];
+  const A = '9780306406157';
+  fs.writeFileSync(path.join(dataDir, 'books.json'), JSON.stringify([{ isbn: A, title: 'A', authors: [] }]));
+  await call('DELETE', `/api/books/${A}`, undefined, c);
+  clock += 61000;
+  assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 404);
+});
