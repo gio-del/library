@@ -228,6 +228,23 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     return fold(q).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
   }
 
+  // Ultimo gruppo eliminato, solo in memoria: 60 secondi per ripristinarlo (copertine comprese).
+  const UNDO_MS = 60000;
+  let lastDeleted = null;
+  async function rememberDeleted(gone) {
+    const items = [];
+    for (const book of gone) {
+      let cover = null;
+      if (book.cover) {
+        const f = path.join(coversDir, book.cover);
+        try { cover = await fsp.readFile(f); } catch { /* copertina assente */ }
+        await fsp.rm(f, { force: true });
+      }
+      items.push({ book, cover });
+    }
+    lastDeleted = items.length ? { items, at: now() } : null;
+  }
+
   async function api(req, res, url) {
     const p = url.pathname;
     if (req.method === 'GET' && p === '/api/auth/status') return send(res, 200, { authenticated: auth.valid(token(req)), coverRead: Boolean(coverReader) });
@@ -313,6 +330,16 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const changed = await classifyAll();
       return send(res, 200, { changed, books: await store.list() });
     }
+    if (req.method === 'POST' && p === '/api/books/restore') {
+      const last = lastDeleted;
+      if (!last || now() - last.at > UNDO_MS) { lastDeleted = null; return send(res, 404, { error: 'Niente da ripristinare' }); }
+      const r = await store.restore(last.items.map((i) => i.book));
+      if (!r.restored.length) return send(res, 409, { error: 'Il libro è già in libreria' });
+      lastDeleted = null;
+      await fsp.mkdir(coversDir, { recursive: true, mode: 0o700 });
+      for (const i of last.items) if (i.cover && r.restored.includes(i.book)) await fsp.writeFile(path.join(coversDir, i.book.cover), i.cover, { mode: 0o600 });
+      return send(res, 200, { books: r.restored, skipped: r.skipped });
+    }
     if (req.method === 'POST' && p === '/api/books/bulk') {
       const b = await readJson(req, MAX_BULK_BODY);
       if (!Array.isArray(b.isbns) || !b.isbns.length || b.isbns.length > 1000 || b.isbns.some((k) => typeof k !== 'string' || !keyRe('').test(k))) return send(res, 400, { error: 'Libri non validi' });
@@ -333,7 +360,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
         delete: () => null,
       }[b.action];
       const r = await store.bulk(b.isbns, change);
-      for (const gone of r.removed) if (gone.cover) await fsp.rm(path.join(coversDir, gone.cover), { force: true });
+      if (r.removed.length) await rememberDeleted(r.removed);
       const done = r.updated.length + r.removed.length;
       return send(res, 200, { updated: r.updated.map((x) => x.isbn), removed: r.removed.map((x) => x.isbn), books: r.updated, done, failed: r.missing.length, unchanged: r.skipped.length });
     }
@@ -412,7 +439,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const isbn = /^m/.test(m[1]) ? m[1] : normalize(m[1]);
       const gone = isbn && (await store.remove(isbn));
       if (!gone) return send(res, 404, { error: 'Non trovato' });
-      if (gone.cover) await fsp.rm(path.join(coversDir, gone.cover), { force: true });
+      await rememberDeleted([gone]);
       return send(res, 200, { ok: true });
     }
     return send(res, 404, { error: 'Non trovato' });
