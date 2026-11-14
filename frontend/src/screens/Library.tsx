@@ -1,7 +1,8 @@
 import { Check, CheckSquare, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ApiError } from '../lib/api';
+import { api, ApiError } from '../lib/api';
+import type { Book } from '../lib/types';
 import { authorCounts, bookGenres, languageCounts, languageOf, publisherCounts, publisherOf, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks, type BulkAction } from '../state/books';
@@ -30,7 +31,7 @@ const MIN_RAIL = 12;
 const LONG_PRESS_MS = 500;
 
 export function Library() {
-  const { books, loaded, load, bulk } = useBooks();
+  const { books, loaded, load, bulk, upsertMany } = useBooks();
   const { toast } = useToast();
   const store = useLibraryView();
   const { key, state: navState } = useLocation();
@@ -103,6 +104,9 @@ export function Library() {
       const r = await bulk(isbns, action, value);
       const word = (n: number) => `${n} ${n === 1 ? 'libro' : 'libri'}`;
       const rest = r.failed + r.unchanged;
+      if (action === 'delete' && r.done) {
+        toast(`Eliminati ${word(r.done)}.`, false, { label: 'Annulla', onClick: () => { void api<{ books: Book[] }>('POST', '/api/books/restore').then((x) => { upsertMany(x.books); toast(`Ripristinati ${word(x.books.length)}.`); }, (e: Error) => toast(e.message, true)); } });
+      } else
       toast(rest ? `Aggiornati ${word(r.done)}, ${rest} non aggiornati.` : `Aggiornati ${word(r.done)}.`, rest > 0);
       stopSelecting();
     } catch (e) {

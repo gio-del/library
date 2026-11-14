@@ -55,7 +55,7 @@ export function BookDetail() {
   const nav = useNavigate();
   const loc = useLocation() as { state: { note?: string } | null };
   const { toast } = useToast();
-  const { books, loaded, load, upsert, remove } = useBooks();
+  const { books, loaded, load, upsert, upsertMany, remove } = useBooks();
   const book = books.find((b) => b.isbn === isbn);
   const serie = book ? seriesSummary(books, book) : null;
   const [editing, setEditing] = useState(false);
@@ -148,9 +148,13 @@ export function BookDetail() {
     });
   }
 
+  async function undo() {
+    try { upsertMany((await api<{ books: Book[] }>('POST', '/api/books/restore')).books); toast('Libro ripristinato'); } catch (e) { toast((e as Error).message, true); }
+  }
+
   async function del() {
     await lock('delete', async () => {
-      try { await api('DELETE', `/api/books/${isbn}`); remove(isbn); nav('/libreria', { replace: true }); toast('Libro eliminato'); } catch (e) { toast((e as Error).message, true); }
+      try { await api('DELETE', `/api/books/${isbn}`); remove(isbn); nav('/libreria', { replace: true }); toast('Libro eliminato', false, { label: 'Annulla', onClick: () => void undo() }); } catch (e) { toast((e as Error).message, true); }
     });
   }
 
