@@ -28,7 +28,7 @@ function server(over: Record<string, unknown> = {}) {
 
 const open = (path: string) => render(<MemoryRouter initialEntries={[path]}><AuthProvider><App /></AuthProvider></MemoryRouter>);
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
 describe('app', () => {
   it('senza sessione mostra l’accesso', async () => {
@@ -1168,5 +1168,45 @@ describe('completa i dati mancanti', () => {
     open('/libro/9780306406157');
     await screen.findByRole('button', { name: 'Mostra i libri di Lewis' });
     expect(screen.queryByRole('button', { name: 'Vedi la collana' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ordine che resta dopo il ricarico', () => {
+  const books = [
+    { isbn: '9780306406157', title: 'Zeta', authors: ['Anna Bianchi'], cover: 'a.jpg', added: '2026-03-01' },
+    { isbn: '9780306406164', title: 'Alfa', authors: ['Carlo Verdi'], cover: 'a.jpg', added: '2026-01-01' },
+  ];
+  const pick = async (name: string) => {
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Ordina per' })).getByRole('button', { name }));
+    await userEvent.keyboard('{Escape}');
+  };
+  const pressed = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const g = await screen.findByRole('group', { name: 'Ordina per' });
+    const on = within(g).getAllByRole('button').filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent);
+    await userEvent.keyboard('{Escape}');
+    return on;
+  };
+
+  it.each([390, 360])('«Titolo A→Z» scelto resta dopo il ricarico a %i px', async (w) => {
+    window.innerWidth = w;
+    server({ 'GET /api/books': books });
+    const first = open('/libreria');
+    await screen.findByText('Zeta');
+    expect(await pressed()).toEqual(['Autore A→Z']);
+    await pick('Titolo A→Z');
+    first.unmount();
+    open('/libreria');
+    await screen.findByText('Zeta');
+    expect(await pressed()).toEqual(['Titolo A→Z']);
+  });
+
+  it('un valore salvato non valido riporta all’ordine predefinito', async () => {
+    localStorage.setItem('library.order', 'boh');
+    server({ 'GET /api/books': books });
+    open('/libreria');
+    await screen.findByText('Zeta');
+    expect(await pressed()).toEqual(['Autore A→Z']);
   });
 });
