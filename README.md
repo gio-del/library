@@ -27,6 +27,8 @@ A ogni salvataggio la versione precedente resta in `DATA_DIR/books.json.bak`; se
 
 Al primo salvataggio di ogni giorno il server salva anche lo stato di prima in `DATA_DIR/backups/books-AAAA-MM-GG.json` (permessi 0600) e tiene le ultime 14 copie. Per tornare a un giorno preciso (per esempio dopo una cancellazione per errore scoperta il giorno dopo): ferma il server, scegli la copia con la data voluta e copiala su `DATA_DIR/books.json` (`cp backups/books-2026-11-01.json books.json`), poi riavvia. Un errore nella scrittura della copia viene solo registrato nel log e non blocca il salvataggio.
 
+Le copie giornaliere riguardano solo `books.json`. `wishlist.json` ha la propria copia `wishlist.json.bak` (la versione precedente a ogni salvataggio; se il file si rovina il server riparte da quella, con un avviso nel log; per ripristinare a mano, a server fermo, copia `wishlist.json.bak` su `wishlist.json`). `goal.json` (l'obiettivo di lettura) è un solo numero e il codice non ne fa nessuna copia `.bak`: se serve, va ridigitato nell'app.
+
 ### Leggere i dati dalla foto della copertina
 
 Funzione facoltativa, spenta di default. Per attivarla: installa Claude Code, fai il login (`claude`, una volta) **con l’utente che fa girare il server** e imposta `CLAUDE_BIN` con il percorso dell’eseguibile. Il server lancia, senza shell, `claude -p --model haiku --strict-mcp-config --tools Read --allowedTools Read --output-format json` in una cartella temporanea propria della richiesta (cancellata sempre), senza strumenti web, una lettura alla volta (le altre ricevono 429). Titolo, autori, editore e lingua letti dalla copertina compilano solo i campi vuoti, marcati «dalla foto»; non si salva nulla finché non premi «Salva».
