@@ -699,3 +699,32 @@ test('POST /api/books/restore: dopo 60 secondi non c\'è più nulla', async (t) 
   clock += 61000;
   assert.strictEqual((await call('POST', '/api/books/restore', undefined, c)).status, 404);
 });
+
+test('POST /api/wishlist/restore: rimette l\'ultimo desiderio tolto, stessa posizione e copertina, una volta sola', async (t) => {
+  const { call, login, dataDir } = await start(t);
+  const c = await login();
+  const A = '9780306406157', B = '9780306406164', X = '9780306406171';
+  fs.mkdirSync(path.join(dataDir, 'covers'));
+  fs.writeFileSync(path.join(dataDir, 'covers', `${B}.jpg`), 'jpgB');
+  fs.writeFileSync(path.join(dataDir, 'wishlist.json'), JSON.stringify([
+    { isbn: A, title: 'A', authors: [], cover: null },
+    { isbn: B, title: 'B', authors: ['x'], cover: `${B}.jpg` },
+    { isbn: X, title: 'X', authors: [], cover: null },
+  ]));
+  assert.strictEqual((await call('POST', '/api/wishlist/restore')).status, 401);
+  assert.strictEqual((await call('POST', '/api/wishlist/restore', undefined, c)).status, 404);
+  await call('DELETE', `/api/wishlist/${B}`, undefined, c);
+  assert.ok(!fs.existsSync(path.join(dataDir, 'covers', `${B}.jpg`)));
+  const r = await call('POST', '/api/wishlist/restore', undefined, c);
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual((await r.json()).index, 1);
+  const list = await (await call('GET', '/api/wishlist', undefined, c)).json();
+  assert.deepStrictEqual(list.map((x) => x.isbn), [A, B, X]);
+  assert.strictEqual(list[1].title, 'B');
+  assert.strictEqual(fs.readFileSync(path.join(dataDir, 'covers', `${B}.jpg`), 'utf8'), 'jpgB');
+  assert.strictEqual((await call('POST', '/api/wishlist/restore', undefined, c)).status, 404);
+  // conflitto: rimesso a mano nel frattempo
+  await call('DELETE', `/api/wishlist/${A}`, undefined, c);
+  await call('POST', '/api/wishlist', { isbn: A }, c);
+  assert.strictEqual((await call('POST', '/api/wishlist/restore', undefined, c)).status, 409);
+});

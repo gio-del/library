@@ -231,6 +231,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
   // Ultimo gruppo eliminato, solo in memoria: 60 secondi per ripristinarlo (copertine comprese).
   const UNDO_MS = 60000;
   let lastDeleted = null;
+  let lastWishRemoved = null; // ultimo desiderio tolto, con posizione e copertina
   async function rememberDeleted(gone) {
     const items = [];
     for (const book of gone) {
@@ -279,12 +280,32 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const r = await addWish(isbn);
       return send(res, r.status, r.body);
     }
+    if (p === '/api/wishlist/restore' && req.method === 'POST') {
+      const last = lastWishRemoved;
+      if (!last || now() - last.at > UNDO_MS) { lastWishRemoved = null; return send(res, 404, { error: 'Niente da ripristinare' }); }
+      if (await store.get(last.item.isbn)) return send(res, 409, { error: 'Ce l’hai già in libreria' });
+      const index = await wishlist.restore(last.item, last.index);
+      if (index === false) return send(res, 409, { error: 'È già tra i desideri' });
+      lastWishRemoved = null;
+      if (last.cover && last.item.cover) {
+        await fsp.mkdir(coversDir, { recursive: true, mode: 0o700 });
+        await fsp.writeFile(path.join(coversDir, last.item.cover), last.cover, { mode: 0o600 });
+      }
+      return send(res, 200, { item: last.item, index });
+    }
     const wd = /^\/api\/wishlist\/([\d-]{10,17}|\d{9}X)$/.exec(p);
     if (req.method === 'DELETE' && wd) {
       const isbn = normalize(wd[1]);
-      const gone = isbn && (await wishlist.remove(isbn));
+      const info = {};
+      const gone = isbn && (await wishlist.remove(isbn, info));
       if (!gone) return send(res, 404, { error: 'Non trovato' });
-      if (gone.cover && !(await store.get(isbn))) await fsp.rm(path.join(coversDir, gone.cover), { force: true });
+      let cover = null;
+      if (gone.cover && !(await store.get(isbn))) {
+        const f = path.join(coversDir, gone.cover);
+        try { cover = await fsp.readFile(f); } catch { /* copertina assente */ }
+        await fsp.rm(f, { force: true });
+      }
+      lastWishRemoved = { item: gone, index: info.index, cover, at: now() };
       return send(res, 200, { ok: true });
     }
     if (req.method === 'GET' && p === '/api/books') {
