@@ -1,8 +1,9 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Share2, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
-import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookTitle, hasIsbn, needsRetry, ratingOf, seriesSummary, todayIso } from '../lib/books';
+import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookShareText, bookTitle, hasIsbn, needsRetry, ratingOf, seriesSummary, todayIso } from '../lib/books';
+import { shareText } from '../lib/share';
 import { isbn10Of } from '../lib/isbn';
 import type { Book, Candidate } from '../lib/types';
 import { useBooks } from '../state/books';
@@ -224,6 +225,7 @@ export function BookDetail() {
         {needsRetry(book) && <Button variant="ghost" disabled={searching} aria-busy={searching} onClick={() => void again()}>{searching ? 'Cerco…' : 'Cerca di nuovo i dati'}</Button>}
         {lookupMsg && <Msg text={lookupMsg.text} error={lookupMsg.error} />}
         <CoverPicker onPick={(f) => void changeCover(f)} />
+        <Button variant="ghost" onClick={() => void shareText(bookTitle(book), bookShareText(book), toast, 'Non riesco a copiare il testo')}><Share2 aria-hidden className="size-5" />Condividi</Button>
         <div className="flex gap-2">
           <button type="button" className={tool} onClick={startEdit}><Pencil aria-hidden className="size-5" />Modifica</button>
           <button type="button" className={`${tool} !bg-ko/10 text-danger`} onClick={() => setAskDelete(true)}><Trash2 aria-hidden className="size-5" />Elimina</button>

@@ -295,3 +295,14 @@ export function wishlistText(items: { isbn: string; title?: string; authors?: st
     return `${title}${authors ? ` — ${authors}` : ''} (${w.isbn})`;
   }).join('\n');
 }
+
+/** Testo per consigliare un libro: titolo, autori, voto se c'è e link di ricerca. Le note personali non entrano mai. */
+export function bookShareText(b: Book): string {
+  const authors = authorsOf(b).join(', ');
+  const rating = ratingOf(b);
+  return [
+    bookTitle(b) + (authors ? ` — ${authors}` : ''),
+    rating ? `Voto: ${rating}/5` : '',
+    amazonSearchUrl(b),
+  ].filter(Boolean).join('\n');
+}
