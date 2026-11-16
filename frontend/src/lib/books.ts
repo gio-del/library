@@ -48,6 +48,21 @@ export function seriesSummary(books: Book[], book: Book): { name: string; total:
   return { name, total: same.length, read: same.filter((b) => b.read).length };
 }
 
+/** Numero nella collana, se è un intero 1-999. */
+export const seriesNoOf = (b: Book) => (Number.isInteger(b.seriesNo) && b.seriesNo! >= 1 && b.seriesNo! <= 999 ? b.seriesNo! : 0);
+
+/** Numeri che mancano tra il più basso e il più alto inseriti nella collana; vuoto con meno di due numeri diversi. */
+export function missingInSeries(books: Book[], series: string): number[] {
+  const key = seriesKey(series);
+  if (!key) return [];
+  const have = new Set(books.filter((b) => seriesKey(seriesOf(b)) === key).map(seriesNoOf).filter(Boolean));
+  if (have.size < 2) return [];
+  const nums = [...have];
+  const out: number[] = [];
+  for (let n = Math.min(...nums); n <= Math.max(...nums); n++) if (!have.has(n)) out.push(n);
+  return out;
+}
+
 export function seriesCounts(books: Book[], f: ReadFilter, selected: string): [string, number][] {
   const counts = new Map<string, number>();
   for (const b of books.filter((x) => matchRead(x, f))) {
@@ -170,9 +185,13 @@ export const matchesQuery = (b: Book, q: string) => {
 };
 
 // Solo per la lista: i libri senza il valore da confrontare vanno in fondo, a parità resta l'ordine di arrivo.
-export function sortBooks(books: Book[], order: SortOrder): Book[] {
+export function sortBooks(books: Book[], order: SortOrder, bySeriesNo = false): Book[] {
   const text = (b: Book) => (order === 'title' ? norm(b.title || '').trim() : authorSortKey(b.authors.find(Boolean) || ''));
   return [...books].sort((a, b) => {
+    if (bySeriesNo) {
+      const x = seriesNoOf(a), y = seriesNoOf(b);
+      if (x !== y) return x && y ? x - y : x ? -1 : 1;
+    }
     if (order === 'rating') {
       const x = ratingOf(a), y = ratingOf(b);
       return x && y ? y - x : x ? -1 : y ? 1 : 0;

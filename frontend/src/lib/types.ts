@@ -6,6 +6,7 @@ export interface Book {
   year?: string | number;
   edition?: string;
   series?: string;
+  seriesNo?: number;
   pages?: string | number;
   language?: string;
   notes?: string;

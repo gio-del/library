@@ -2,7 +2,7 @@ import { Pencil, Share2, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, putCover, toJpeg } from '../lib/api';
-import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookShareText, bookTitle, hasIsbn, needsRetry, ratingOf, seriesSummary, todayIso } from '../lib/books';
+import { GENRES, authorsOf, MAX_GENRES, UNCLASSIFIED, bookGenres, bookShareText, bookTitle, hasIsbn, needsRetry, ratingOf, seriesNoOf, seriesSummary, missingInSeries, todayIso } from '../lib/books';
 import { shareText } from '../lib/share';
 import { isbn10Of } from '../lib/isbn';
 import type { Book, Candidate } from '../lib/types';
@@ -31,7 +31,7 @@ function rows(b: Book): [string, string][] {
   const added = b.added && !Number.isNaN(Date.parse(b.added)) ? new Date(b.added).toLocaleDateString('it-IT') : '';
   const all: [string, unknown][] = [
     ['Autori', (b.authors || []).join(', ')], ['Edizione', b.edition], ['Editore', b.publisher], ['Anno', b.year],
-    ['Generi', bookGenres(b).join(', ')], ['Collana', b.series], ['Pagine', b.pages], ['Lingua', b.language], ['Posizione', b.location],
+    ['Generi', bookGenres(b).join(', ')], ['Collana', b.series], ['Numero nella collana', seriesNoOf(b) || ''], ['Pagine', b.pages], ['Lingua', b.language], ['Posizione', b.location],
     ['Note', b.notes], ['ISBN-13', hasIsbn(b) ? b.isbn : ''], ['ISBN-10', isbn10Of(b.isbn)],
     ['Fonte dei dati', b.source && (SOURCES[b.source] || b.source)], ['Aggiunto il', added],
   ];
@@ -59,6 +59,7 @@ export function BookDetail() {
   const { books, loaded, load, upsert, upsertMany, remove } = useBooks();
   const book = books.find((b) => b.isbn === isbn);
   const serie = book ? seriesSummary(books, book) : null;
+  const missing = serie ? missingInSeries(books, serie.name) : [];
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [picked, setPicked] = useState<string[]>([]);
@@ -93,6 +94,7 @@ export function BookDetail() {
     const f: Record<string, string> = { authors: (book!.authors || []).join(', ') };
     setPicked(bookGenres(book!).filter((g) => g !== UNCLASSIFIED));
     for (const k of EDIT) f[k] = String(book![k] ?? '');
+    f.seriesNo = String(seriesNoOf(book!) || '');
     setForm(f);
     setFormErr('');
     setFromPhoto([]);
@@ -106,6 +108,10 @@ export function BookDetail() {
     const body: Record<string, unknown> = { authors: list(form.authors) };
     if (picked.join('|') !== bookGenres(book!).filter((g) => g !== UNCLASSIFIED).join('|')) body.genres = picked;
     for (const k of EDIT) body[k] = form[k];
+    const no = form.seriesNo.trim();
+    if (no && !/^\d{1,3}$/.test(no)) { setFormErr('Il numero nella collana è un intero da 1 a 999'); return; }
+    if (no && (Number(no) < 1 || Number(no) > 999)) { setFormErr('Il numero nella collana è un intero da 1 a 999'); return; }
+    body.seriesNo = form.series.trim() && no ? Number(no) : null;
     if (await patch(body, 'Salvato')) setEditing(false);
   }
 
@@ -196,6 +202,7 @@ export function BookDetail() {
           {EDIT.filter((k) => k !== 'title' && k !== 'notes').map((k) => (
             <Field key={k} label={`${lab(cat, k, LABELS[k])}${mark(k)}`}><Input value={form[k]} maxLength={k === 'location' ? 80 : undefined} placeholder={k === 'location' ? 'Es. Salotto, scaffale 2' : undefined} inputMode={k === 'year' || k === 'pages' ? 'numeric' : undefined} onChange={(e) => { setForm({ ...form, [k]: e.target.value }); setCat(cat.filter((x) => x !== k)); setFromPhoto(fromPhoto.filter((x) => x !== k)); }} /></Field>
           ))}
+          {form.series.trim() && <Field label="Numero nella collana"><Input value={form.seriesNo} maxLength={3} inputMode="numeric" placeholder="Es. 3" onChange={(e) => setForm({ ...form, seriesNo: e.target.value })} /></Field>}
           <Field label="Note"><Textarea rows={3} maxLength={1000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
           {coverRead && book.cover && <div className="mt-4"><ReadPhotoButton getPhoto={photo} onRead={applyRead} disabled={busy} /></div>}
           <div className="mt-4 flex flex-col gap-2">
@@ -232,7 +239,10 @@ export function BookDetail() {
         </div>
         {serie && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-paper p-4 shadow-sm">
-            <p className="m-0 [overflow-wrap:anywhere]">Collana: {serie.total} libri, {serie.read} letti</p>
+            <div className="min-w-0">
+              <p className="m-0 [overflow-wrap:anywhere]">Collana: {serie.total} libri, {serie.read} letti</p>
+              {missing.length > 0 && <p className="m-0 mt-1 [overflow-wrap:anywhere]">Mancano: {missing.join(', ')}</p>}
+            </div>
             <button type="button" onClick={() => nav('/libreria', { state: { series: serie.name } })} className="min-h-11 rounded-full bg-lilac-soft px-4 font-medium text-title">Vedi la collana</button>
           </div>
         )}

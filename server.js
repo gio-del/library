@@ -14,7 +14,7 @@ const { lookup, fetchCover } = require('./lib/lookup');
 const { searchBooks } = require('./lib/search');
 const { classify, MAX_GENRES } = require('./lib/genres');
 const { createCoverReader } = require('./lib/coverread');
-const { cleanFields, cleanReading, toCsv, parseImport } = require('./lib/exporter');
+const { cleanFields, cleanReading, cleanSeriesNo, toCsv, parseImport } = require('./lib/exporter');
 
 const MAX_BODY = 4096;
 const MAX_COVER_UPLOAD = 2 * 1024 * 1024;
@@ -432,11 +432,15 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const rd = cleanReading(b);
       if (rd.error) return send(res, 400, { error: rd.error });
       Object.assign(patch, rd.set);
+      const sn = cleanSeriesNo(b);
+      if (sn.error) return send(res, 400, { error: sn.error });
+      if ('value' in sn) patch.seriesNo = sn.value;
       if (!Object.keys(patch).length && !rd.unset.length) return send(res, 400, { error: 'Stato non valido' });
       const old = await store.get(pt[1]);
       const next = old && { ...old, ...patch };
       for (const k of rd.unset) if (next) delete next[k];
       if (next && !next.location) delete next.location;
+      if (next && next.seriesNo == null) delete next.seriesNo;
       const book = next && (await store.replace(next));
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
     }

@@ -1238,6 +1238,69 @@ describe('completa i dati mancanti', () => {
     expect(screen.getByRole('button', { name: 'Togli il filtro Collana Narnia' })).toBeInTheDocument();
   });
 
+  it('la scheda mostra «Mancano: 3» con i numeri 1, 2 e 4 e il numero si salva dalla modifica', async () => {
+    window.innerWidth = 360;
+    const uno = { isbn: '9780306406157', title: 'Uno', authors: ['A'], series: 'Narnia', seriesNo: 1, cover: 'a.jpg' };
+    server({ 'GET /api/books': [
+      uno,
+      { isbn: '9780306406164', title: 'Due', authors: ['A'], series: 'Narnia', seriesNo: 2, cover: 'b.jpg' },
+      { isbn: '9780306406171', title: 'Quattro', authors: ['A'], series: 'Narnia', seriesNo: 4, cover: 'c.jpg' },
+    ], 'PATCH /api/books/9780306406157': { book: { ...uno, seriesNo: 2 } } });
+    const sent: unknown[] = [];
+    const f = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === 'PATCH') sent.push(JSON.parse(String(init.body))); return (f as typeof fetch)(url, init); }));
+    open('/libro/9780306406157');
+    expect(await screen.findByText('Mancano: 3')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Modifica/ }));
+    const input = screen.getByLabelText('Numero nella collana');
+    await userEvent.clear(input);
+    await userEvent.type(input, '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByText('Il numero nella collana è un intero da 1 a 999')).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+    await userEvent.clear(input);
+    await userEvent.type(input, '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    await screen.findByText('Salvato');
+    expect((sent[0] as { seriesNo: number }).seriesNo).toBe(2);
+  });
+
+  it('senza buchi o con un solo numero la scheda non mostra «Mancano»', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Uno', authors: ['A'], series: 'Narnia', seriesNo: 1, cover: 'a.jpg' },
+      { isbn: '9780306406164', title: 'Due', authors: ['A'], series: 'Narnia', seriesNo: 2, cover: 'b.jpg' },
+      { isbn: '9780306406171', title: 'Senza', authors: ['A'], series: 'Narnia', cover: 'c.jpg' },
+    ] });
+    open('/libro/9780306406157');
+    await screen.findByText('Collana: 3 libri, 0 letti');
+    expect(screen.queryByText(/Mancano/)).not.toBeInTheDocument();
+  });
+
+  it('il campo numero compare solo se il libro ha una collana', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [{ isbn: '9780306406157', title: 'Uno', authors: ['A'], cover: 'a.jpg' }] });
+    open('/libro/9780306406157');
+    await userEvent.click(await screen.findByRole('button', { name: /Modifica/ }));
+    expect(screen.queryByLabelText('Numero nella collana')).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Collana'), 'Saga');
+    expect(screen.getByLabelText('Numero nella collana')).toBeInTheDocument();
+  });
+
+  it('col filtro collana i libri sono in ordine di numero', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Terzo', authors: ['A'], series: 'Narnia', seriesNo: 3, cover: 'a.jpg' },
+      { isbn: '9780306406164', title: 'Primo', authors: ['Z'], series: 'Narnia', seriesNo: 1, cover: 'b.jpg' },
+      { isbn: '9780306406171', title: 'Senza', authors: ['B'], series: 'Narnia', cover: 'c.jpg' },
+    ] });
+    open('/libro/9780306406157');
+    await userEvent.click(await screen.findByRole('button', { name: 'Vedi la collana' }));
+    await screen.findByText('Primo');
+    const order = screen.getAllByText(/^(Primo|Terzo|Senza)$/).map((e) => e.textContent);
+    expect(order).toEqual(['Primo', 'Terzo', 'Senza']);
+  });
+
   it('la riga Collana non compare se nessun altro libro ha la stessa collana', async () => {
     window.innerWidth = 360;
     server({ 'GET /api/books': [
