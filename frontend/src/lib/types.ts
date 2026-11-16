@@ -9,6 +9,7 @@ export interface Book {
   pages?: string | number;
   language?: string;
   notes?: string;
+  location?: string;
   genres?: string[];
   cover?: string | null;
   read?: boolean;
