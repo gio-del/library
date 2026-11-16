@@ -1,4 +1,4 @@
-import { groupLabel, amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, languageCounts, publisherCounts, authorCounts, sortBooks, topAuthors, seriesSummary } from '../lib/books';
+import { groupLabel, amazonSearchUrl, findOtherEdition, sameWork, bookGenres, filterBooks, genreCounts, libraryStats, groupStarts, matchesQuery, isIncomplete, needsRetry, seriesCounts, languageCounts, publisherCounts, authorCounts, sortBooks, topAuthors, seriesSummary, missingInSeries } from '../lib/books';
 import { isbn10Of, looksLikeIsbn, validIsbn13 } from '../lib/isbn';
 import type { Book } from '../lib/types';
 
@@ -242,5 +242,30 @@ describe('isIncomplete', () => {
     expect(isIncomplete(b({ ...full, publisher: ' ' }))).toBe(true);
     expect(isIncomplete(b({ ...full, year: '' }))).toBe(true);
     expect(isIncomplete(b({ ...full, publisher: undefined }))).toBe(true);
+  });
+});
+
+describe('missingInSeries', () => {
+  const s = (no: number | undefined, series = 'Saga') => b({ isbn: `s${no}-${Math.random()}`, series, seriesNo: no });
+  it('segnala i buchi tra il numero più basso e il più alto', () => {
+    expect(missingInSeries([s(1), s(2), s(4)], 'Saga')).toEqual([3]);
+    expect(missingInSeries([s(5), s(1), s(2)], ' saga ')).toEqual([3, 4]);
+  });
+  it('i duplicati non contano e senza buchi non dà nulla', () => {
+    expect(missingInSeries([s(1), s(1), s(2), s(2)], 'Saga')).toEqual([]);
+    expect(missingInSeries([s(2), s(2), s(4)], 'Saga')).toEqual([3]);
+  });
+  it('con un solo numero, nessun numero o altre collane non dà nulla', () => {
+    expect(missingInSeries([s(3)], 'Saga')).toEqual([]);
+    expect(missingInSeries([s(3), s(3)], 'Saga')).toEqual([]);
+    expect(missingInSeries([s(undefined), s(1), s(9, 'Altra')], 'Saga')).toEqual([]);
+    expect(missingInSeries([s(1), s(3)], '')).toEqual([]);
+  });
+});
+
+describe('sortBooks per numero di collana', () => {
+  it('con la collana attiva ordina per numero, senza numero in fondo', () => {
+    const l = [b({ isbn: 'x', title: 'A' }), b({ isbn: 'c', seriesNo: 3 }), b({ isbn: 'a', seriesNo: 1 }), b({ isbn: 'd', seriesNo: 10 })];
+    expect(sortBooks(l, 'title', true).map((x) => x.isbn)).toEqual(['a', 'c', 'd', 'x']);
   });
 });

@@ -747,3 +747,18 @@ test('PATCH: posizione facoltativa, fino a 80 caratteri, vuota o null la toglie'
   r = await patch({ location: '  ' });
   assert.ok(!('location' in (await r.json()).book));
 });
+
+test('PATCH: numero nella collana intero 1-999, null lo toglie, altri valori 400', async (t) => {
+  const { call, login } = await start(t);
+  const sid = await login();
+  const isbn = '9780306406157';
+  await call('POST', '/api/books', { isbn }, sid);
+  const patch = async (body) => call('PATCH', `/api/books/${isbn}`, body, sid);
+  let r = await patch({ seriesNo: 3 });
+  assert.strictEqual((await r.json()).book.seriesNo, 3);
+  for (const v of [0, 1000, 1.5, '2', true, []]) assert.strictEqual((await patch({ seriesNo: v })).status, 400);
+  assert.strictEqual((await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json()).seriesNo, 3);
+  assert.strictEqual((await patch({ seriesNo: 999 })).status, 200);
+  r = await patch({ seriesNo: null });
+  assert.ok(!('seriesNo' in (await r.json()).book));
+});

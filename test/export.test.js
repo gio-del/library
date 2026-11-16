@@ -9,9 +9,9 @@ test('CSV: intestazione, virgolette, a capo e protezione dalle formule', () => {
     { isbn: 'm0123456789ab', title: '+1', authors: [], year: '', read: false, genres: [], notes: '@x' },
   ]);
   const lines = csv.replace(/^﻿/, '').split('\r\n');
-  assert.strictEqual(lines[0], 'ISBN,Titolo,Autori,Editore,Anno,Letto,Generi,Note,Voto,Data di lettura,Posizione');
+  assert.strictEqual(lines[0], 'ISBN,Titolo,Autori,Editore,Anno,Letto,Generi,Note,Voto,Data di lettura,Posizione,Collana,Numero nella collana');
   assert.ok(lines[1].startsWith('9780306406157,"Dire ""ciao"", a tutti",A B; C D,\'=cmd(),1999,sì,Narrativa,"riga1\nriga2"'));
-  assert.strictEqual(lines[2], ",'+1,,,,no,,'@x,,,");
+  assert.strictEqual(lines[2], ",'+1,,,,no,,'@x,,,,,");
 });
 
 test('import: libro valido, ripulito dai campi non ammessi', () => {
@@ -60,9 +60,24 @@ test('import: desideri validi, non validi e troppi', () => {
 
 test('posizione: nel CSV (protetta dalle formule) e nell\'import JSON', () => {
   const csv = toCsv([{ isbn: '9780306406157', title: 'T', authors: [], read: false, genres: [], location: '=Salotto' }]);
-  assert.ok(csv.replace(/^\uFEFF/, '').split('\r\n')[1].endsWith(",'=Salotto"));
+  assert.ok(csv.replace(/^\uFEFF/, '').split('\r\n')[1].endsWith(",'=Salotto,,"));
   const r = parseImport(JSON.stringify([{ isbn: '9780306406157', title: 'T', location: ' Salotto, scaffale 2 ' }, { isbn: '9780306406164', title: 'U', location: '' }, { isbn: '9780306406171', title: 'V', location: 'x'.repeat(81) }]));
   assert.strictEqual(r.books[0].location, 'Salotto, scaffale 2');
   assert.ok(!('location' in r.books[1]));
   assert.strictEqual(r.invalid, 1);
+});
+
+test('numero nella collana: nel CSV e nell\'import JSON (solo interi 1-999)', () => {
+  const csv = toCsv([{ isbn: '9780306406157', title: 'T', authors: [], read: false, genres: [], series: 'Saga', seriesNo: 3 }]);
+  assert.ok(csv.replace(/^\uFEFF/, '').split('\r\n')[1].endsWith(',Saga,3'));
+  const r = parseImport(JSON.stringify([
+    { isbn: '9780306406157', title: 'T', series: 'Saga', seriesNo: 3 },
+    { isbn: '9780306406164', title: 'U', seriesNo: 0 },
+    { isbn: '9780306406171', title: 'V', seriesNo: 1000 },
+    { isbn: '9780306406188', title: 'W', seriesNo: 1.5 },
+    { isbn: '9780306406195', title: 'X', seriesNo: '2' },
+  ]));
+  assert.strictEqual(r.books[0].seriesNo, 3);
+  for (const b of r.books.slice(1)) assert.ok(!('seriesNo' in b));
+  assert.strictEqual(r.invalid, 0);
 });

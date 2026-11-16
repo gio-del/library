@@ -79,7 +79,7 @@ export function Library() {
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
-  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!location || norm(locationOf(b)) === norm(location)) && (!language || norm(languageOf(b)) === norm(language)) && (!publisher || norm(publisherOf(b)) === norm(publisher)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, location, language, publisher, author, incomplete, minRating, order]);
+  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!location || norm(locationOf(b)) === norm(location)) && (!language || norm(languageOf(b)) === norm(language)) && (!publisher || norm(publisherOf(b)) === norm(publisher)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order, series !== ''), [searched, state, genre, series, location, language, publisher, author, incomplete, minRating, order]);
   useEffect(() => {
     if (pendingScroll.current === null || !loaded) return;
     window.scrollTo({ top: pendingScroll.current });
