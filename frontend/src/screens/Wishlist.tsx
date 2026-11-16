@@ -2,6 +2,7 @@ import { ExternalLink, Share2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { amazonSearchUrl, wishlistText } from '../lib/books';
 import { api } from '../lib/api';
+import { shareText } from '../lib/share';
 import type { Book, WishItem } from '../lib/types';
 import { useBooks } from '../state/books';
 import { Button, Cover, Msg } from '../components/ui';
@@ -59,14 +60,7 @@ export function Wishlist() {
   async function share() {
     if (!items || items.length === 0) return;
     const text = wishlistText(items);
-    if (typeof navigator.share === 'function') {
-      try { await navigator.share({ title: 'Lista dei desideri', text }); } catch { /* annullata */ }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      toast('Copiato');
-    } catch { toast('Non riesco a copiare la lista', true); }
+    await shareText('Lista dei desideri', text, toast, 'Non riesco a copiare la lista');
   }
 
   return (

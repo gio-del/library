@@ -944,6 +944,43 @@ describe('app', () => {
     });
   });
 
+  describe('condividi un libro', () => {
+    const rated = { ...BOOKS[1], rating: 4, notes: 'segreto personale', isbn: '9780306406164' };
+    const text = 'Narnia — C. S. Lewis\nVoto: 4/5\nhttps://www.amazon.it/s?k=9780306406164';
+    afterEach(() => {
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    });
+
+    it('con navigator.share condivide titolo, autori e voto, senza note; più tocchi, più condivisioni', async () => {
+      window.innerWidth = 360;
+      const share = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+      server({ 'GET /api/books': [BOOKS[0], rated] });
+      open('/libro/9780306406164');
+      const btn = await screen.findByRole('button', { name: 'Condividi' });
+      expect(btn.className).toContain('min-h-11');
+      expect(btn.querySelector('svg')).not.toBeNull();
+      await userEvent.click(btn);
+      await userEvent.click(btn);
+      expect(share).toHaveBeenCalledTimes(2);
+      expect(share).toHaveBeenCalledWith({ title: 'Narnia', text });
+      expect(JSON.stringify(share.mock.calls)).not.toContain('segreto');
+    });
+
+    it('senza navigator.share copia negli appunti e avvisa; senza voto la riga manca', async () => {
+      window.innerWidth = 360;
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      server();
+      open('/libro/9780306406157');
+      await userEvent.click(await screen.findByRole('button', { name: 'Condividi' }));
+      expect(writeText).toHaveBeenCalledWith('Mansfield Park — Jane Austen\nhttps://www.amazon.it/s?k=9780306406157');
+      expect(await screen.findByText('Copiato')).toBeInTheDocument();
+    });
+  });
+
   it('«Cerca di nuovo i dati» su un ISBN non trovato lascia un messaggio che resta', async () => {
     const book = { isbn: '9788817152754', title: '', authors: [], genres: [], cover: '9788817152754.jpg', lookup: 'failed' };
     let release: () => void = () => {};
