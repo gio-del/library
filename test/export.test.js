@@ -11,7 +11,7 @@ test('CSV: intestazione, virgolette, a capo e protezione dalle formule', () => {
   const lines = csv.replace(/^﻿/, '').split('\r\n');
   assert.strictEqual(lines[0], 'ISBN,Titolo,Autori,Editore,Anno,Letto,Generi,Note,Voto,Data di lettura,Posizione');
   assert.ok(lines[1].startsWith('9780306406157,"Dire ""ciao"", a tutti",A B; C D,\'=cmd(),1999,sì,Narrativa,"riga1\nriga2"'));
-  assert.strictEqual(lines[2], ",'+1,,,,no,,'@x,,");
+  assert.strictEqual(lines[2], ",'+1,,,,no,,'@x,,,");
 });
 
 test('import: libro valido, ripulito dai campi non ammessi', () => {
