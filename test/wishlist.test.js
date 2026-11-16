@@ -20,3 +20,17 @@ test('desideri: niente doppioni, resta dopo il riavvio, copia .bak e file rovina
   fs.writeFileSync(path.join(dir, 'wishlist.json'), '{rotto');
   assert.deepStrictEqual((await createWishlist(dir).list()).map((x) => x.isbn), ['1', '2']);
 });
+
+test('desideri: restore rimette l\'elemento nella posizione di prima e salva', async () => {
+  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lib-wish-')), 'dati');
+  const w = createWishlist(dir);
+  for (const isbn of ['1', '2', '3']) await w.add({ isbn, title: isbn });
+  const info = {};
+  const gone = await w.remove('2', info);
+  assert.strictEqual(info.index, 1);
+  assert.strictEqual(await w.restore(gone, info.index), 1);
+  assert.strictEqual(await w.restore(gone, 1), false);
+  assert.deepStrictEqual((await createWishlist(dir).list()).map((x) => x.isbn), ['1', '2', '3']);
+  await w.remove('3'); await w.remove('2');
+  assert.strictEqual(await w.restore(gone, 9), 1); // indice oltre la fine: in coda
+});

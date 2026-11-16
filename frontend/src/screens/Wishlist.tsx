@@ -27,9 +27,21 @@ export function Wishlist() {
     try {
       await api('DELETE', `/api/wishlist/${w.isbn}`);
       drop(w.isbn);
-      toast('Tolto dai desideri');
+      toast('Tolto dai desideri', false, { label: 'Annulla', onClick: () => { void undo(); } });
     } catch (e) { toast((e as Error).message, true); }
     setBusy('');
+  }
+
+  async function undo() {
+    try {
+      const r = await api<{ item: WishItem; index: number }>('POST', '/api/wishlist/restore');
+      setItems((cur) => {
+        const list = (cur || []).filter((x) => x.isbn !== r.item.isbn);
+        list.splice(Math.min(r.index, list.length), 0, r.item);
+        return list;
+      });
+      toast('Desiderio rimesso');
+    } catch (e) { toast((e as Error).message, true); }
   }
 
   async function bought(w: WishItem) {
