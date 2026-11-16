@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import type { Book } from '../lib/types';
-import { authorCounts, bookGenres, languageCounts, languageOf, publisherCounts, publisherOf, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
+import { authorCounts, bookGenres, languageCounts, languageOf, locationCounts, locationOf, publisherCounts, publisherOf, hasAuthor, isIncomplete, bookTitle, genreCounts, matchesQuery, matchRead, norm, ratingOf, seriesCounts, seriesKey, seriesOf, groupStarts, sortBooks, type ReadFilter, type SortOrder } from '../lib/books';
 import { cn } from '../lib/cn';
 import { useBooks, type BulkAction } from '../state/books';
 import { useToast } from '../components/Toast';
@@ -40,6 +40,7 @@ export function Library() {
   const [state, setState] = useState<ReadFilter>(saved?.state ?? 'all');
   const [genre, setGenre] = useState(saved?.genre ?? '');
   const [series, setSeries] = useState(saved?.series ?? '');
+  const [location, setLocation] = useState(saved?.location ?? '');
   const [language, setLanguage] = useState(saved?.language ?? '');
   const [publisher, setPublisher] = useState(saved?.publisher ?? '');
   const [author, setAuthor] = useState(saved?.author ?? '');
@@ -59,15 +60,15 @@ export function Library() {
   const longPressed = useRef(false);
   const first = useRef(true);
   const pendingScroll = useRef<number | null>(saved ? saved.scrollY : null);
-  const view = useRef<Omit<LibraryView, 'scrollY'>>({ key, state, genre, series, language, publisher, author, incomplete, minRating, order, query });
-  view.current = { key, state, genre, series, language, publisher, author, incomplete, minRating, order, query };
+  const view = useRef<Omit<LibraryView, 'scrollY'>>({ key, state, genre, series, location, language, publisher, author, incomplete, minRating, order, query });
+  view.current = { key, state, genre, series, location, language, publisher, author, incomplete, minRating, order, query };
 
   // Un tocco su «Libreria» in alto naviga di nuovo qui (nuova key): azzera ricerca, filtri e posizione.
   // Dalla scheda del libro si arriva con l'autore scelto nello stato di navigazione.
   useEffect(() => {
     if (first.current) { first.current = false; if (saved) return; }
     pendingScroll.current = null;
-    setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setLanguage(''); setPublisher(''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(savedOrder()); // eslint-disable-next-line react-hooks/exhaustive-deps
+    setState('all'); setGenre(''); setSeries(typeof navState?.series === 'string' ? navState.series : ''); setLocation(''); setLanguage(''); setPublisher(''); setAuthor(typeof navState?.author === 'string' ? navState.author : ''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(savedOrder()); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   // All'uscita dalla Libreria si salvano i filtri e la posizione di scorrimento.
@@ -78,7 +79,7 @@ export function Library() {
   const q = norm(query.trim());
   // I conteggi dello stato e dei generi tengono conto della ricerca, così i numeri sui chip sono quelli che si vedranno.
   const searched = useMemo(() => books.filter((b) => matchesQuery(b, q)), [books, q]);
-  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!language || norm(languageOf(b)) === norm(language)) && (!publisher || norm(publisherOf(b)) === norm(publisher)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, language, publisher, author, incomplete, minRating, order]);
+  const shown = useMemo(() => sortBooks(searched.filter((b) => matchRead(b, state) && (!genre || bookGenres(b).includes(genre)) && (!series || seriesKey(seriesOf(b)) === seriesKey(series)) && (!location || norm(locationOf(b)) === norm(location)) && (!language || norm(languageOf(b)) === norm(language)) && (!publisher || norm(publisherOf(b)) === norm(publisher)) && (!author || hasAuthor(b, author)) && (!incomplete || isIncomplete(b)) && ratingOf(b) >= minRating), order), [searched, state, genre, series, location, language, publisher, author, incomplete, minRating, order]);
   useEffect(() => {
     if (pendingScroll.current === null || !loaded) return;
     window.scrollTo({ top: pendingScroll.current });
@@ -122,12 +123,13 @@ export function Library() {
   };
   const genres = genreCounts(searched, state, genre);
   const seriesList = seriesCounts(searched, state, series);
+  const locationList = locationCounts(searched, state, location);
   const languageList = languageCounts(searched, state, language);
   const publisherList = publisherCounts(searched, state, publisher);
   const authorList = authorCounts(searched, state, author);
   const incompleteCount = searched.filter((b) => matchRead(b, state) && isIncomplete(b)).length;
   const count = (f: ReadFilter) => searched.filter((b) => matchRead(b, f)).length;
-  const active = state !== 'all' || genre !== '' || series !== '' || language !== '' || publisher !== '' || author !== '' || incomplete || minRating > 0 || q !== '' || order !== DEFAULT_ORDER;
+  const active = state !== 'all' || genre !== '' || series !== '' || location !== '' || language !== '' || publisher !== '' || author !== '' || incomplete || minRating > 0 || q !== '' || order !== DEFAULT_ORDER;
 
   let status = '';
   if (err) status = err;
@@ -148,7 +150,7 @@ export function Library() {
           </button>
           <button type="button" aria-label="Filtri" onClick={() => setOpen(true)} className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-plum-2 text-white">
             <SlidersHorizontal aria-hidden />
-            {(genre || series || language || publisher || author || incomplete || minRating > 0) && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
+            {(genre || series || location || language || publisher || author || incomplete || minRating > 0) && <span aria-hidden data-testid="filter-dot" className="absolute right-2 top-2 size-2.5 rounded-full bg-gold ring-2 ring-plum-2" />}
           </button>
         </div>
         <div role="group" aria-label="Stato" className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-lilac-soft p-1">
@@ -156,11 +158,12 @@ export function Library() {
             <button key={f} type="button" aria-pressed={state === f} onClick={() => setState(f)} className={cn('min-h-11 min-w-0 rounded-lg px-1 text-center text-sm font-medium leading-tight', state === f ? 'bg-plum text-white' : 'text-title')}>{label} ({count(f)})</button>
           ))}
         </div>
-        {(genre || series || language || publisher || author || incomplete || minRating > 0 || q) && (
+        {(genre || series || location || language || publisher || author || incomplete || minRating > 0 || q) && (
           <div data-testid="active-filters" className="mt-2 flex flex-wrap gap-2">
             {q && <button type="button" onClick={() => setQuery('')} aria-label={`Togli il filtro Testo ${query.trim()}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Testo {query.trim()}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {genre && <button type="button" onClick={() => setGenre('')} aria-label={`Togli il filtro ${genre}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">{genre}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {series && <button type="button" onClick={() => setSeries('')} aria-label={`Togli il filtro Collana ${series}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Collana {series}</span><X aria-hidden className="size-4 shrink-0" /></button>}
+            {location && <button type="button" onClick={() => setLocation('')} aria-label={`Togli il filtro Posizione ${location}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Posizione {location}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {language && <button type="button" onClick={() => setLanguage('')} aria-label={`Togli il filtro Lingua ${language}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Lingua {language}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {publisher && <button type="button" onClick={() => setPublisher('')} aria-label={`Togli il filtro Editore ${publisher}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Editore {publisher}</span><X aria-hidden className="size-4 shrink-0" /></button>}
             {author && <button type="button" onClick={() => setAuthor('')} aria-label={`Togli il filtro Autore ${author}`} className="flex min-h-11 max-w-full items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-medium text-title"><span className="min-w-0 [overflow-wrap:anywhere]">Autore {author}</span><X aria-hidden className="size-4 shrink-0" /></button>}
@@ -258,6 +261,15 @@ export function Library() {
             </div>
           </>
         )}
+        {(locationList.length > 0 || location !== '') && (
+          <>
+            <p className="mb-2 mt-4 text-sm font-medium text-muted">Posizione</p>
+            <div role="group" aria-label="Posizione" className="flex flex-col gap-2">
+              <GenreRow label="Tutte le posizioni" count={count(state)} on={location === ''} onPick={() => { setLocation(''); setOpen(false); }} />
+              {locationList.map(([s, c]) => <GenreRow key={s} label={s} count={c} on={norm(location) === norm(s)} onPick={() => { setLocation(s); setOpen(false); }} />)}
+            </div>
+          </>
+        )}
         {(languageList.length >= 2 || language !== '') && (
           <>
             <p className="mb-2 mt-4 text-sm font-medium text-muted">Lingua</p>
@@ -285,7 +297,7 @@ export function Library() {
             </div>
           </>
         )}
-        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setLanguage(''); setPublisher(''); setAuthor(''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); saveOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-title disabled:opacity-50">Azzera tutto</button>
+        <button type="button" disabled={!active} onClick={() => { setState('all'); setGenre(''); setSeries(''); setLocation(''); setLanguage(''); setPublisher(''); setAuthor(''); setIncomplete(false); setMinRating(0); setQuery(''); setOrder(DEFAULT_ORDER); saveOrder(DEFAULT_ORDER); setOpen(false); }} className="mt-4 min-h-11 w-full rounded-xl bg-lilac-soft font-medium text-title disabled:opacity-50">Azzera tutto</button>
       </Sheet>
     </section>
   );

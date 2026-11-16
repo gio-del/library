@@ -1181,6 +1181,48 @@ describe('completa i dati mancanti', () => {
     expect(screen.getByText('Fonte non raggiunta: 0')).toBeInTheDocument();
   });
 
+  it('la posizione: filtro con conteggi, chip, ricerca e modifica dalla scheda', async () => {
+    window.innerWidth = 360;
+    server({ 'GET /api/books': [
+      { isbn: '9780306406157', title: 'Mansfield Park', authors: ['Jane Austen'], cover: 'a.jpg', added: '2026-03-01' },
+      { isbn: '9780306406164', title: 'Il leone', authors: ['C. S. Lewis'], cover: 'b.jpg', added: '2026-02-01', location: 'Salotto, scaffale 2' },
+      { isbn: '9780306406171', title: 'Caspian', authors: ['C. S. Lewis'], cover: 'c.jpg', added: '2026-01-01', location: ' salotto,  scaffale 2' },
+    ] });
+    open('/libreria');
+    await screen.findByText('Mansfield Park');
+    const titles = () => screen.getAllByRole('link', { name: /Mansfield|leone|Caspian/ }).map((a) => a.textContent);
+    await userEvent.type(screen.getByRole('searchbox'), 'scaffale');
+    expect(titles()).toHaveLength(2);
+    await userEvent.clear(screen.getByRole('searchbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+    const pick = within(await screen.findByRole('group', { name: 'Posizione' })).getByRole('button', { name: /Salotto, scaffale 2/ });
+    expect(pick).toHaveTextContent('2');
+    await userEvent.click(pick);
+    expect(titles()).toHaveLength(2);
+    const chip = screen.getByRole('button', { name: /^Togli il filtro Posizione Salotto/ });
+    await userEvent.click(chip);
+    expect(titles()).toHaveLength(3);
+  });
+
+  it('dalla scheda la posizione si mostra e si modifica', async () => {
+    window.innerWidth = 360;
+    const book = { isbn: '9780306406171', title: 'Caspian', authors: [], genres: [] as string[], location: 'Studio' };
+    server({ 'GET /api/books': [book], 'PATCH /api/books/9780306406171': { book: { ...book, location: 'Salotto' } } });
+    const sent: unknown[] = [];
+    const f = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === 'PATCH') sent.push(JSON.parse(String(init.body))); return (f as typeof fetch)(url, init); }));
+    open('/libro/9780306406171');
+    expect(await screen.findByText('Studio')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Modifica/ }));
+    const input = screen.getByLabelText('Posizione');
+    expect(input).toHaveAttribute('maxlength', '80');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Salotto');
+    await userEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    await screen.findByText('Salvato');
+    expect((sent[0] as { location: string }).location).toBe('Salotto');
+  });
+
   it('dalla scheda la riga Collana mostra i letti e apre la Libreria filtrata', async () => {
     window.innerWidth = 360;
     server({ 'GET /api/books': [

@@ -76,6 +76,9 @@ function valueCounts(books: Book[], f: ReadFilter, selected: string, of: (b: Boo
 
 /** Lingue dei libri con i conteggi (senza distinguere maiuscole, spazi o accenti); i valori vuoti si ignorano. */
 export const languageCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, languageOf);
+export const locationOf = (b: Book) => (typeof b.location === 'string' ? b.location.trim().replace(/\s+/g, ' ') : '');
+/** Posizioni dei libri con i conteggi (senza distinguere maiuscole, spazi o accenti). */
+export const locationCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, locationOf);
 export const publisherCounts = (books: Book[], f: ReadFilter, selected: string) => valueCounts(books, f, selected, publisherOf);
 
 export const authorsOf = (b: Book): string[] => (Array.isArray(b.authors) ? b.authors : []).filter((a): a is string => typeof a === 'string' && !!a.trim()).map((a) => a.trim());
@@ -160,10 +163,10 @@ export function authorSortKey(name: string): string {
   return [...w.slice(i), ...w.slice(0, i)].join(' ');
 }
 
-/** Il testo cercato (già normalizzato con `norm`) compare nel titolo, negli autori, nella collana o nelle note. */
+/** Il testo cercato (già normalizzato con `norm`) compare nel titolo, negli autori, nella collana, nella posizione o nelle note. */
 export const matchesQuery = (b: Book, q: string) => {
   const needle = norm(q.trim());
-  return !needle || norm([b.title, ...(b.authors || []), b.series, b.notes].filter((x) => typeof x === 'string' && x).join(' ')).includes(needle);
+  return !needle || norm([b.title, ...(b.authors || []), b.series, b.location, b.notes].filter((x) => typeof x === 'string' && x).join(' ')).includes(needle);
 };
 
 // Solo per la lista: i libri senza il valore da confrontare vanno in fondo, a parità resta l'ordine di arrivo.

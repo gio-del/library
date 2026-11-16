@@ -9,7 +9,7 @@ test('CSV: intestazione, virgolette, a capo e protezione dalle formule', () => {
     { isbn: 'm0123456789ab', title: '+1', authors: [], year: '', read: false, genres: [], notes: '@x' },
   ]);
   const lines = csv.replace(/^﻿/, '').split('\r\n');
-  assert.strictEqual(lines[0], 'ISBN,Titolo,Autori,Editore,Anno,Letto,Generi,Note,Voto,Data di lettura');
+  assert.strictEqual(lines[0], 'ISBN,Titolo,Autori,Editore,Anno,Letto,Generi,Note,Voto,Data di lettura,Posizione');
   assert.ok(lines[1].startsWith('9780306406157,"Dire ""ciao"", a tutti",A B; C D,\'=cmd(),1999,sì,Narrativa,"riga1\nriga2"'));
   assert.strictEqual(lines[2], ",'+1,,,,no,,'@x,,");
 });
@@ -56,4 +56,13 @@ test('import: desideri validi, non validi e troppi', () => {
   assert.deepStrictEqual(parseImport('[]').wishlist, []);
   assert.deepStrictEqual(parseImport('{"books":[]}').wishlist, []);
   assert.ok(parseImport(JSON.stringify({ books: [], wishlist: new Array(5001).fill({}) })).error);
+});
+
+test('posizione: nel CSV (protetta dalle formule) e nell\'import JSON', () => {
+  const csv = toCsv([{ isbn: '9780306406157', title: 'T', authors: [], read: false, genres: [], location: '=Salotto' }]);
+  assert.ok(csv.replace(/^\uFEFF/, '').split('\r\n')[1].endsWith(",'=Salotto"));
+  const r = parseImport(JSON.stringify([{ isbn: '9780306406157', title: 'T', location: ' Salotto, scaffale 2 ' }, { isbn: '9780306406164', title: 'U', location: '' }, { isbn: '9780306406171', title: 'V', location: 'x'.repeat(81) }]));
+  assert.strictEqual(r.books[0].location, 'Salotto, scaffale 2');
+  assert.ok(!('location' in r.books[1]));
+  assert.strictEqual(r.invalid, 1);
 });

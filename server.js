@@ -203,6 +203,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
     const f = cleanFields(b);
     if (f.error) return { status: 400, body: { error: f.error } };
     const fields = f.fields;
+    if (!fields.location) delete fields.location;
     if (!fields.title) return { status: 400, body: { error: 'Il titolo è obbligatorio' } };
     let isbn = null;
     if (typeof b.isbn === 'string' && b.isbn.trim()) {
@@ -224,7 +225,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
   // Ricerca testuale (senza accenti e maiuscole) su titolo, autori e ISBN.
   const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   function matches(book, q) {
-    const hay = fold([book.title, ...(book.authors || []), book.isbn, book.series].join(' '));
+    const hay = fold([book.title, ...(book.authors || []), book.isbn, book.series, book.location].join(' '));
     return fold(q).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
   }
 
@@ -435,6 +436,7 @@ function createServer({ config, fetchFn = fetch, now = Date.now }) {
       const old = await store.get(pt[1]);
       const next = old && { ...old, ...patch };
       for (const k of rd.unset) if (next) delete next[k];
+      if (next && !next.location) delete next.location;
       const book = next && (await store.replace(next));
       return book ? send(res, 200, { book }) : send(res, 404, { error: 'Non trovato' });
     }

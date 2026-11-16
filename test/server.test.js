@@ -728,3 +728,22 @@ test('POST /api/wishlist/restore: rimette l\'ultimo desiderio tolto, stessa posi
   await call('POST', '/api/wishlist', { isbn: A }, c);
   assert.strictEqual((await call('POST', '/api/wishlist/restore', undefined, c)).status, 409);
 });
+
+test('PATCH: posizione facoltativa, fino a 80 caratteri, vuota o null la toglie', async (t) => {
+  const { call, login } = await start(t);
+  const sid = await login();
+  const isbn = '9780306406157';
+  await call('POST', '/api/books', { isbn }, sid);
+  const patch = async (body) => call('PATCH', `/api/books/${isbn}`, body, sid);
+  let r = await patch({ location: ' Salotto, scaffale 2 ' });
+  assert.strictEqual((await r.json()).book.location, 'Salotto, scaffale 2');
+  assert.strictEqual((await patch({ location: 'x'.repeat(81) })).status, 400);
+  assert.strictEqual((await patch({ location: 5 })).status, 400);
+  assert.strictEqual((await (await call('GET', `/api/books/${isbn}`, undefined, sid)).json()).location, 'Salotto, scaffale 2');
+  assert.strictEqual((await patch({ location: 'x'.repeat(80) })).status, 200);
+  r = await patch({ location: null });
+  assert.ok(!('location' in (await r.json()).book));
+  await patch({ location: 'Studio' });
+  r = await patch({ location: '  ' });
+  assert.ok(!('location' in (await r.json()).book));
+});
